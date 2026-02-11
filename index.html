@@ -6,254 +6,248 @@
     <title>HYROX ENGINE</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="theme-color" content="#000000">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&family=SF+Pro+Text:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <meta name="theme-color" content="#0a0a0a">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; margin: 0; padding: 0; }
         
         :root {
-            --bg-primary: #000000;
-            --bg-card: rgba(28, 28, 30, 0.8);
-            --bg-elevated: rgba(44, 44, 46, 0.8);
-            --border: rgba(56, 56, 58, 0.6);
-            --text-primary: #ffffff;
-            --text-secondary: rgba(235, 235, 245, 0.6);
-            --text-tertiary: rgba(235, 235, 245, 0.3);
-            --accent-blue: #0A84FF;
-            --accent-green: #30D158;
-            --accent-orange: #FF9F0A;
-            --accent-red: #FF453A;
-            --accent-purple: #BF5AF2;
-            --accent-cyan: #64D2FF;
-            --accent-pink: #FF375F;
+            --bg: #0a0a0a;
+            --card: #141414;
+            --card-border: rgba(255,255,255,0.06);
+            --text: #ffffff;
+            --text-secondary: rgba(255,255,255,0.6);
+            --text-tertiary: rgba(255,255,255,0.35);
+            --accent: #00D4AA;
+            --accent-warm: #F5A623;
+            --accent-blue: #4A90D9;
+            --accent-purple: #9B59B6;
+            --accent-red: #E74C3C;
         }
         
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.4;
-            overflow-x: hidden;
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
             -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
         }
         
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* Oura-style animations */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Gradient backgrounds */
+        .gradient-recovery {
+            background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 50%, #0a1520 100%);
+        }
+        .gradient-aerobic {
+            background: linear-gradient(135deg, #1a4a3a 0%, #0d3020 50%, #0a2015 100%);
+        }
+        .gradient-race {
+            background: linear-gradient(135deg, #4a3a1a 0%, #302510 50%, #201a0a 100%);
+        }
+        .gradient-hyrox {
+            background: linear-gradient(135deg, #3a1a4a 0%, #200d30 50%, #150a20 100%);
+        }
+        .gradient-session {
+            background: linear-gradient(165deg, #2c3e50 0%, #1a252f 40%, #0d1318 100%);
         }
         
-        @keyframes ringDraw {
-            from { stroke-dashoffset: 251.2; }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.02); opacity: 0.9; }
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
-        }
-        
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        
-        .fade-in-up { animation: fadeInUp 0.6s ease-out forwards; opacity: 0; }
-        .delay-1 { animation-delay: 0.1s; }
-        .delay-2 { animation-delay: 0.2s; }
-        .delay-3 { animation-delay: 0.3s; }
-        .delay-4 { animation-delay: 0.4s; }
-        .delay-5 { animation-delay: 0.5s; }
-        
-        /* Glass morphism cards */
-        .glass-card {
-            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 20px;
-        }
-        
-        .glass-card-subtle {
-            background: rgba(28, 28, 30, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 16px;
-        }
-        
-        /* Ring styles */
-        .ring-container {
+        /* Aurora effect */
+        .aurora {
             position: relative;
+            overflow: hidden;
+        }
+        .aurora::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(0, 212, 170, 0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 60%, rgba(74, 144, 217, 0.1) 0%, transparent 40%);
+            animation: aurora 15s ease-in-out infinite;
+            pointer-events: none;
+        }
+        @keyframes aurora {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(-5%, 5%) rotate(3deg); }
+        }
+        
+        /* Cards */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:active {
+            transform: scale(0.98);
+        }
+        .card-metric {
+            position: relative;
+            padding: 20px;
+            min-height: 160px;
             display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .svg-ring { transform: rotate(-90deg); }
-        .svg-ring circle { fill: none; stroke-linecap: round; }
-        .svg-ring .ring-bg { stroke: rgba(255,255,255,0.08); }
-        .svg-ring .ring-progress { 
-            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
-            filter: drop-shadow(0 0 6px currentColor);
-        }
-        
-        /* Session cards */
-        .session-card {
-            background: rgba(28, 28, 30, 0.6);
-            border: 1px solid rgba(255,255,255,0.06);
-            border-radius: 16px;
-            padding: 16px;
-            transition: all 0.2s ease;
+            flex-direction: column;
+            justify-content: space-between;
             cursor: pointer;
         }
-        
-        .session-card:active {
-            transform: scale(0.98);
-            background: rgba(44, 44, 46, 0.8);
+        .card-metric::after {
+            content: '→';
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            opacity: 0.4;
+            font-size: 18px;
         }
         
-        .session-card.is-today {
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 20px rgba(10, 132, 255, 0.15), inset 0 0 20px rgba(10, 132, 255, 0.05);
+        /* Score arc */
+        .score-container {
+            position: relative;
+            width: 80px;
+            height: 80px;
+        }
+        .score-arc {
+            transform: rotate(-90deg);
+        }
+        .score-arc circle {
+            fill: none;
+            stroke-linecap: round;
+        }
+        .score-arc .bg {
+            stroke: rgba(255,255,255,0.1);
+        }
+        .score-arc .progress {
+            transition: stroke-dashoffset 1s ease-out;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+        .score-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            font-weight: 700;
         }
         
-        .session-card.is-complete {
-            border-color: var(--accent-green);
-            box-shadow: 0 0 20px rgba(48, 209, 88, 0.1);
-        }
-        
-        /* Zone badges */
-        .zone-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
-            border-radius: 8px;
+        /* Typography */
+        .label {
             font-size: 11px;
             font-weight: 600;
-            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            opacity: 0.6;
+        }
+        .insight {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+        .value-large {
+            font-size: 42px;
+            font-weight: 300;
+            letter-spacing: -1px;
+        }
+        .value-unit {
+            font-size: 16px;
+            font-weight: 400;
+            opacity: 0.6;
+            margin-left: 4px;
         }
         
-        .zone-1 { background: rgba(100, 210, 255, 0.15); color: var(--accent-cyan); }
-        .zone-2 { background: rgba(48, 209, 88, 0.15); color: var(--accent-green); }
-        .zone-3 { background: rgba(255, 214, 10, 0.15); color: #FFD60A; }
-        .zone-4 { background: rgba(255, 159, 10, 0.15); color: var(--accent-orange); }
-        .zone-5 { background: rgba(255, 69, 58, 0.15); color: var(--accent-red); }
-        .zone-strength { background: rgba(191, 90, 242, 0.15); color: var(--accent-purple); }
-        .zone-sim { background: rgba(255, 55, 95, 0.15); color: var(--accent-pink); }
-        .zone-rest { background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); }
-        
-        /* Progress bars */
+        /* Progress bar */
         .progress-bar {
             height: 6px;
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.1);
             border-radius: 3px;
             overflow: hidden;
         }
-        
         .progress-fill {
             height: 100%;
             border-radius: 3px;
-            transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: width 0.8s ease-out;
         }
         
-        /* Buttons */
-        .btn-primary {
-            background: var(--accent-blue);
-            color: white;
-            border: none;
-            border-radius: 14px;
-            padding: 16px 24px;
-            font-weight: 600;
-            font-size: 16px;
+        /* Session card */
+        .session-card {
+            position: relative;
+            padding: 24px;
+            min-height: 140px;
             cursor: pointer;
-            transition: all 0.2s;
-            width: 100%;
         }
-        
-        .btn-primary:active { transform: scale(0.98); opacity: 0.9; }
-        
-        .btn-secondary {
-            background: rgba(255,255,255,0.1);
-            color: white;
-            border: none;
-            border-radius: 14px;
-            padding: 16px 24px;
+        .session-type {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
+            margin-bottom: 12px;
+        }
+        .session-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        .session-detail {
+            font-size: 14px;
+            color: var(--text-secondary);
         }
         
         /* Modal */
         .modal-overlay {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.85);
             backdrop-filter: blur(20px);
             z-index: 100;
-            display: flex;
-            align-items: flex-end;
-            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
         }
-        
+        .modal-overlay.open {
+            opacity: 1;
+            visibility: visible;
+        }
         .modal-content {
-            background: #1c1c1e;
-            border-radius: 20px 20px 0 0;
-            width: 100%;
-            max-width: 500px;
-            max-height: 92vh;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            max-height: 90vh;
+            background: #1a1a1a;
+            border-radius: 24px 24px 0 0;
             overflow-y: auto;
-            animation: slideUp 0.3s ease-out;
+            transform: translateY(100%);
+            transition: transform 0.3s ease-out;
         }
-        
+        .modal-overlay.open .modal-content {
+            transform: translateY(0);
+        }
         .modal-handle {
-            width: 36px;
-            height: 5px;
+            width: 40px;
+            height: 4px;
             background: rgba(255,255,255,0.2);
-            border-radius: 3px;
-            margin: 8px auto 16px;
+            border-radius: 2px;
+            margin: 12px auto 20px;
         }
-        
-        /* Inputs */
-        input, select {
-            width: 100%;
-            background: rgba(44, 44, 46, 0.8);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 12px;
-            padding: 14px 16px;
-            color: white;
-            font-size: 17px;
-            font-family: inherit;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        
-        input:focus, select:focus { border-color: var(--accent-blue); }
-        input::placeholder { color: var(--text-tertiary); }
         
         /* Navigation */
-        .nav-bar {
+        .nav {
             position: fixed;
             bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 100%;
-            max-width: 500px;
-            background: rgba(28, 28, 30, 0.95);
+            left: 0;
+            right: 0;
+            background: rgba(20,20,20,0.95);
             backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255,255,255,0.08);
-            padding: 8px 20px calc(8px + env(safe-area-inset-bottom));
+            border-top: 1px solid var(--card-border);
+            padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+            display: flex;
+            justify-content: space-around;
             z-index: 50;
         }
-        
         .nav-item {
             display: flex;
             flex-direction: column;
@@ -263,617 +257,687 @@
             color: var(--text-tertiary);
             font-size: 10px;
             font-weight: 500;
-            cursor: pointer;
             background: none;
             border: none;
+            cursor: pointer;
             transition: color 0.2s;
         }
+        .nav-item.active {
+            color: var(--accent);
+        }
+        .nav-item svg {
+            width: 24px;
+            height: 24px;
+        }
         
-        .nav-item.active { color: var(--accent-blue); }
-        .nav-item svg { width: 24px; height: 24px; }
+        /* Detail page header */
+        .detail-header {
+            position: relative;
+            padding: 60px 24px 30px;
+            min-height: 280px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .detail-back {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.3);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
         
-        /* Typography helpers */
-        .text-xs { font-size: 11px; }
-        .text-sm { font-size: 13px; }
-        .text-base { font-size: 15px; }
-        .text-lg { font-size: 17px; }
-        .text-xl { font-size: 20px; }
-        .text-2xl { font-size: 24px; }
-        .text-3xl { font-size: 28px; }
-        .text-4xl { font-size: 34px; }
-        .text-5xl { font-size: 48px; }
+        /* Data row */
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--card-border);
+        }
+        .data-row:last-child {
+            border-bottom: none;
+        }
         
-        .font-light { font-weight: 300; }
-        .font-medium { font-weight: 500; }
-        .font-semibold { font-weight: 600; }
-        .font-bold { font-weight: 700; }
+        /* Trend indicator */
+        .trend {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .trend.up { color: var(--accent); }
+        .trend.down { color: var(--accent-red); }
+        .trend.neutral { color: var(--text-tertiary); }
         
-        .text-primary { color: var(--text-primary); }
-        .text-secondary { color: var(--text-secondary); }
-        .text-tertiary { color: var(--text-tertiary); }
+        /* Animations */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeInUp 0.5s ease-out forwards; }
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .delay-4 { animation-delay: 0.4s; opacity: 0; }
         
-        .uppercase { text-transform: uppercase; }
-        .tracking-wide { letter-spacing: 0.5px; }
-        .tracking-wider { letter-spacing: 1px; }
+        /* Utility */
+        .container { max-width: 500px; margin: 0 auto; padding-bottom: 100px; }
+        .px-4 { padding-left: 16px; padding-right: 16px; }
+        .py-4 { padding-top: 16px; padding-bottom: 16px; }
+        .mb-3 { margin-bottom: 12px; }
+        .mb-4 { margin-bottom: 16px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body>
     <div id="app"></div>
+    
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <script type="text/babel">
         const { useState, useEffect, useCallback, useMemo } = React;
 
         // ============================================
-        // CONFIGURATION
+        // CONFIG
         // ============================================
-        const SHEETS_CONFIG = {
-            sheetId: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc',
-            sheets: { workouts: 'Workouts', daily: 'DailyMetrics' }
+        const SHEETS = {
+            id: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc',
+            workouts: 'Workouts',
+            daily: 'DailyMetrics'
         };
 
         const TARGETS = {
             vo2max: 48,
-            twoKmTime: 465,
-            thresholdPace: 255,
-            twentyMinDist: 5.2,
-            miniSimTotal: 1540,
-            weeklyVolume: 50,
+            twoKm: 465, // 7:45
+            threshold: 255, // 4:15/km
+            weeklyVol: 50,
+            raceTime: 65 * 60, // 1:05:00
         };
 
         const BASELINES = {
             vo2max: 43.5,
-            twoKmTime: 540,
-            thresholdPace: 285,
-            twentyMinDist: 4.5,
-            miniSimTotal: 1800,
-        };
-
-        // ============================================
-        // PERIODIZATION - Research-backed 14-month plan
-        // ============================================
-        const PHASES = [
-            { 
-                id: 'base1', name: 'Base 1', weeks: 6, focus: 'Aerobic Foundation',
-                desc: 'Build consistent running habit and aerobic base.',
-                volStart: 25, volEnd: 35,
-                dist: { z2: 85, threshold: 0, vo2: 5, strength: 10, sim: 0 },
-                keyWorkouts: ['Long run building to 90min', '5-6 easy runs per week'],
-                research: 'Maffetone/Seiler: Build aerobic base before intensity. Capillary density, mitochondrial biogenesis, fat oxidation all improve with easy volume.',
-            },
-            { 
-                id: 'base2', name: 'Base 2', weeks: 6, focus: 'Volume + Threshold Intro',
-                desc: 'Continue volume build while introducing threshold work.',
-                volStart: 35, volEnd: 45,
-                dist: { z2: 75, threshold: 10, vo2: 5, strength: 10, sim: 0 },
-                keyWorkouts: ['Long run 90-100min', 'Weekly tempo/threshold session'],
-                research: 'Threshold work begins after 6+ weeks of base. Lactate clearance improves, sustainable pace increases.',
-            },
-            { 
-                id: 'build1', name: 'Build 1', weeks: 6, focus: 'VO2max Development',
-                desc: 'Add VO2max intervals while maintaining volume.',
-                volStart: 45, volEnd: 55,
-                dist: { z2: 70, threshold: 10, vo2: 12, strength: 8, sim: 0 },
-                keyWorkouts: ['Long run 100-110min', '5x4min VO2max intervals', 'Threshold maintenance'],
-                research: 'Billat research: VO2max intervals (90-100% vVO2max) are most potent stimulus for aerobic power. 2-3 week adaptation lag.',
-            },
-            { 
-                id: 'brace', name: 'B-Race Block', weeks: 4, focus: 'Race Sharpening',
-                desc: 'Prepare for B-race. Test current fitness.',
-                volStart: 50, volEnd: 35,
-                dist: { z2: 60, threshold: 15, vo2: 10, strength: 5, sim: 10 },
-                keyWorkouts: ['Race simulation', 'Threshold sharpening', '10-14 day taper'],
-                research: 'Mujika taper research: 40-60% volume reduction, maintain intensity, 8-14 days optimal for performance peak.',
-            },
-            { 
-                id: 'recovery', name: 'Recovery', weeks: 2, focus: 'Post-Race Recovery',
-                desc: 'Active recovery and mental reset.',
-                volStart: 20, volEnd: 30,
-                dist: { z2: 95, threshold: 0, vo2: 0, strength: 5, sim: 0 },
-                keyWorkouts: ['Easy running only', 'Light mobility work'],
-                research: 'Post-race recovery essential. Glycogen replenishment, muscle repair, psychological freshness for next block.',
-            },
-            { 
-                id: 'build2', name: 'Build 2', weeks: 8, focus: 'Peak Fitness',
-                desc: 'Highest training load. Major fitness gains.',
-                volStart: 35, volEnd: 60,
-                dist: { z2: 70, threshold: 12, vo2: 12, strength: 6, sim: 0 },
-                keyWorkouts: ['Long run up to 120min', 'VO2max intervals 2x/week', 'Threshold sessions'],
-                research: 'Brownlee study: +100km monthly = -4.4min race time. This is the volume accumulation phase.',
-            },
-            { 
-                id: 'specific', name: 'Specificity', weeks: 6, focus: 'HYROX-Specific',
-                desc: 'Race-specific work. Running under fatigue.',
-                volStart: 55, volEnd: 50,
-                dist: { z2: 60, threshold: 10, vo2: 10, strength: 5, sim: 15 },
-                keyWorkouts: ['Mini-sims 2x/week', 'Station practice', 'Threshold under fatigue'],
-                research: 'Specificity principle: final 6-8 weeks should mimic race demands. Neural pacing adaptations, fatigue resistance.',
-            },
-            { 
-                id: 'taper', name: 'Peak & Taper', weeks: 3, focus: 'Arrive Fresh',
-                desc: 'Reduce volume, maintain intensity. Race ready.',
-                volStart: 45, volEnd: 20,
-                dist: { z2: 65, threshold: 10, vo2: 10, strength: 0, sim: 15 },
-                keyWorkouts: ['Short sharp intervals', 'Race pace openers', 'Full rest before race'],
-                research: 'Bosquet meta-analysis: optimal taper is 2-3 weeks, 41-60% volume reduction. Freshness + fitness = performance.',
-            },
-        ];
-
-        const getPhaseForWeek = (week) => {
-            let cumulative = 0;
-            for (const phase of PHASES) {
-                if (week <= cumulative + phase.weeks) {
-                    return { ...phase, weekInPhase: week - cumulative, totalWeeks: phase.weeks };
-                }
-                cumulative += phase.weeks;
-            }
-            return { ...PHASES[PHASES.length - 1], weekInPhase: 1, totalWeeks: 3 };
-        };
-
-        const getVolumeForWeek = (week) => {
-            const phase = getPhaseForWeek(week);
-            const progress = (phase.weekInPhase - 1) / Math.max(1, phase.totalWeeks - 1);
-            let volume = phase.volStart + (phase.volEnd - phase.volStart) * progress;
-            if (week % 4 === 0) volume *= 0.7; // Deload week
-            return Math.round(volume);
-        };
-
-        // ============================================
-        // SESSION TEMPLATES
-        // ============================================
-        const createSession = (type, params = {}) => {
-            const sessions = {
-                easyRun: {
-                    name: 'Easy Run',
-                    type: 'run',
-                    zone: 2,
-                    duration: params.duration || 45,
-                    distance: params.distance || 7,
-                    desc: 'Conversational pace throughout',
-                    purpose: 'Builds aerobic base, promotes recovery, and develops fat oxidation. The foundation of endurance.',
-                    structure: [
-                        { name: 'Warm-up', time: '5 min', detail: 'Walk to easy jog' },
-                        { name: 'Main Run', time: `${(params.duration || 45) - 10} min`, detail: 'Easy pace @ 5:30-6:30/km, HR 130-145' },
-                        { name: 'Cool-down', time: '5 min', detail: 'Easy jog to walk' },
-                    ],
-                    targets: { hr: '130-145 bpm', pace: '5:30-6:30/km', rpe: '4-5/10' },
-                    research: 'Seiler: 80% of training at low intensity. Polarized > threshold model for endurance.',
-                },
-                longRun: {
-                    name: 'Long Run',
-                    type: 'run',
-                    zone: 2,
-                    duration: params.duration || 90,
-                    distance: Math.round((params.duration || 90) / 6),
-                    desc: 'Extended aerobic development',
-                    purpose: 'Maximizes aerobic adaptations, teaches fat burning, builds mental toughness and glycogen storage.',
-                    structure: [
-                        { name: 'Easy Start', time: '15 min', detail: 'Very relaxed, let body warm up' },
-                        { name: 'Main Run', time: `${(params.duration || 90) - 20} min`, detail: 'Steady Z2 pace, even effort' },
-                        { name: 'Cool-down', time: '5 min', detail: 'Easy finish' },
-                    ],
-                    targets: { hr: '130-145 bpm', pace: '5:45-6:30/km', rpe: '5-6/10' },
-                    research: 'Long run is non-negotiable for endurance. Biggest stimulus for mitochondrial density.',
-                },
-                threshold: {
-                    name: `${params.reps || 4}×${params.repTime || 6}min Threshold`,
-                    type: 'run',
-                    zone: 4,
-                    duration: (params.reps || 4) * ((params.repTime || 6) + (params.rest || 2)) + 20,
-                    distance: null,
-                    desc: 'Sustained hard effort at lactate threshold',
-                    purpose: 'Raises lactate threshold - the pace you can sustain for ~60min. Key for HYROX run splits.',
-                    structure: [
-                        { name: 'Warm-up', time: '10 min', detail: 'Easy jog + 4×30s strides' },
-                        { name: 'Main Set', time: `${(params.reps || 4) * ((params.repTime || 6) + (params.rest || 2))} min`, detail: `${params.reps || 4}×${params.repTime || 6}min @ threshold, ${params.rest || 2}min jog recovery` },
-                        { name: 'Cool-down', time: '10 min', detail: 'Easy jog' },
-                    ],
-                    targets: { hr: '160-170 bpm', pace: '4:20-4:50/km', rpe: '7-8/10' },
-                    research: 'Threshold training improves lactate clearance. Sustainable hard effort.',
-                },
-                vo2max: {
-                    name: `${params.reps || 5}×${params.repTime || 4}min VO₂max`,
-                    type: 'run',
-                    zone: 5,
-                    duration: (params.reps || 5) * ((params.repTime || 4) + (params.rest || 3)) + 20,
-                    distance: null,
-                    desc: 'High intensity intervals',
-                    purpose: 'Expands VO₂max - your aerobic ceiling. The size of your engine.',
-                    structure: [
-                        { name: 'Warm-up', time: '10 min', detail: 'Easy jog + 4×30s strides' },
-                        { name: 'Main Set', time: `${(params.reps || 5) * ((params.repTime || 4) + (params.rest || 3))} min`, detail: `${params.reps || 5}×${params.repTime || 4}min HARD, ${params.rest || 3}min easy jog` },
-                        { name: 'Cool-down', time: '10 min', detail: 'Easy jog' },
-                    ],
-                    targets: { hr: '170-185 bpm', pace: '3:50-4:20/km', rpe: '9/10' },
-                    research: 'Billat: VO₂max intervals most potent aerobic stimulus. 2-3 weeks adaptation lag.',
-                },
-                twoKmTT: {
-                    name: '2km Time Trial',
-                    type: 'test',
-                    zone: 5,
-                    duration: 25,
-                    distance: 2,
-                    desc: 'All-out benchmark test',
-                    purpose: 'Tests current VO₂max/top-end speed. Track progress every 4 weeks.',
-                    structure: [
-                        { name: 'Warm-up', time: '10 min', detail: 'Easy jog + 4×100m strides' },
-                        { name: '2km TT', time: '~8 min', detail: 'ALL OUT. Even pacing critical.' },
-                        { name: 'Cool-down', time: '7 min', detail: 'Walk/easy jog' },
-                    ],
-                    targets: { current: '~9:00', goal: '7:45', rpe: '10/10' },
-                    research: '2km TT correlates with VO₂max. Use to track fitness.',
-                },
-                twentyMinTest: {
-                    name: '20-min Threshold Test',
-                    type: 'test',
-                    zone: 4,
-                    duration: 35,
-                    distance: null,
-                    desc: 'Max distance in 20 minutes',
-                    purpose: 'Measures functional threshold. Average pace ≈ your threshold pace.',
-                    structure: [
-                        { name: 'Warm-up', time: '10 min', detail: 'Easy + strides' },
-                        { name: '20-min effort', time: '20 min', detail: 'Max SUSTAINABLE effort. Don\'t blow up early.' },
-                        { name: 'Cool-down', time: '5 min', detail: 'Walk/easy jog' },
-                    ],
-                    targets: { current: '~4.5km', goal: '5.2km', rpe: '8-9/10' },
-                    research: 'FTP test adapted from cycling. Avg pace = threshold.',
-                },
-                strengthA: {
-                    name: 'Strength A: Lower Body',
-                    type: 'strength',
-                    zone: 'strength',
-                    duration: 45,
-                    distance: null,
-                    desc: 'Lower body + posterior chain',
-                    purpose: 'Builds strength endurance for sled, lunges, running under fatigue.',
-                    structure: [
-                        { name: 'Warm-up', time: '8 min', detail: 'Bike/row + dynamic stretches' },
-                        { name: 'Strength', time: '30 min', detail: 'See exercises' },
-                        { name: 'Cool-down', time: '7 min', detail: 'Stretch + foam roll' },
-                    ],
-                    exercises: [
-                        { name: 'Back Squat', sets: '4×6-8', rest: '90s' },
-                        { name: 'Romanian Deadlift', sets: '3×8-10', rest: '90s' },
-                        { name: 'Walking Lunges', sets: '3×12 each', rest: '60s' },
-                        { name: 'Leg Press', sets: '3×12-15', rest: '60s' },
-                        { name: 'Calf Raises', sets: '3×15-20', rest: '45s' },
-                    ],
-                    targets: { load: '70-80% 1RM', rpe: '7-8/10' },
-                    research: 'Strength endurance (high rep, moderate load) builds fatigue resistance.',
-                },
-                strengthB: {
-                    name: 'Strength B: Upper + Functional',
-                    type: 'strength',
-                    zone: 'strength',
-                    duration: 45,
-                    distance: null,
-                    desc: 'Upper body + HYROX stations',
-                    purpose: 'Builds capacity for ski, row, wall balls, burpees.',
-                    structure: [
-                        { name: 'Warm-up', time: '8 min', detail: 'Bike/row + mobility' },
-                        { name: 'Strength', time: '30 min', detail: 'See exercises' },
-                        { name: 'Cool-down', time: '7 min', detail: 'Stretch' },
-                    ],
-                    exercises: [
-                        { name: 'Pull-ups/Lat Pulldown', sets: '4×6-10', rest: '90s' },
-                        { name: 'DB Row', sets: '3×10 each', rest: '60s' },
-                        { name: 'Push Press', sets: '3×8-10', rest: '90s' },
-                        { name: 'Wall Balls', sets: '3×20', rest: '60s' },
-                        { name: 'Ski Erg', sets: '3×250m', rest: '90s' },
-                    ],
-                    targets: { load: 'Moderate', rpe: '7/10' },
-                    research: 'Upper body often neglected. Critical for HYROX stations.',
-                },
-                miniSim: {
-                    name: `Mini-Sim: ${params.station || 'Row 500m'}`,
-                    type: 'sim',
-                    zone: 'sim',
-                    duration: 30,
-                    distance: 4,
-                    desc: '4 rounds: 1km run + station',
-                    purpose: 'Race-specific conditioning. Tests pacing and fatigue resistance.',
-                    structure: [
-                        { name: 'Warm-up', time: '5 min', detail: 'Easy jog' },
-                        { name: 'Round 1', time: '~6 min', detail: `1km run → ${params.station || 'Row 500m'}` },
-                        { name: 'Round 2', time: '~6 min', detail: `1km run → ${params.station || 'Row 500m'}` },
-                        { name: 'Round 3', time: '~6 min', detail: `1km run → ${params.station || 'Row 500m'}` },
-                        { name: 'Round 4', time: '~6 min', detail: `1km run → ${params.station || 'Row 500m'}` },
-                        { name: 'Cool-down', time: '5 min', detail: 'Walk' },
-                    ],
-                    targets: { splits: '4:25-4:40/km', decay: '<5%', total: '25:40' },
-                    research: 'Specificity: must practice race demands. Neural pacing adaptations.',
-                },
-                rest: {
-                    name: 'Rest Day',
-                    type: 'rest',
-                    zone: 'rest',
-                    duration: 0,
-                    distance: 0,
-                    desc: 'Complete rest or light activity',
-                    purpose: 'Recovery is when adaptation happens. Training breaks down; rest builds up.',
-                    structure: [
-                        { name: 'Option A', time: '0 min', detail: 'Complete rest' },
-                        { name: 'Option B', time: '20 min', detail: 'Easy walk + stretching' },
-                        { name: 'Option C', time: '15 min', detail: 'Yoga/mobility' },
-                    ],
-                    targets: { hr: 'Low', rpe: '1-2/10' },
-                    research: '1-2 rest days/week optimal. Overtraining is real.',
-                },
-            };
-            return sessions[type] || sessions.rest;
+            twoKm: 540, // 9:00
+            threshold: 285, // 4:45/km
         };
 
         // ============================================
         // UTILITIES
         // ============================================
-        const formatTime = (sec) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
-        const formatPace = (sec) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}/km`;
-        const formatDuration = (min) => min >= 60 ? `${Math.floor(min/60)}h ${min%60}m` : `${min}min`;
-        const parseTime = (str) => {
-            if (!str) return 0;
-            const p = str.split(':');
-            return p.length === 2 ? parseInt(p[0])*60 + parseInt(p[1]) : parseInt(str) || 0;
+        const storage = {
+            get: (k, d) => { try { return JSON.parse(localStorage.getItem('hyrox9_'+k)) || d; } catch { return d; }},
+            set: (k, v) => localStorage.setItem('hyrox9_'+k, JSON.stringify(v))
         };
 
-        const storage = {
-            get: (k, d) => { try { const v = localStorage.getItem('hyrox8_'+k); return v ? JSON.parse(v) : d; } catch { return d; } },
-            set: (k, v) => localStorage.setItem('hyrox8_'+k, JSON.stringify(v))
-        };
+        const formatTime = (s) => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+        const formatPace = (s) => `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}/km`;
+        const parseTime = (str) => { const p = str?.split(':'); return p?.length === 2 ? parseInt(p[0])*60 + parseInt(p[1]) : 0; };
 
         const fetchSheet = async (name) => {
-            const url = `https://docs.google.com/spreadsheets/d/${SHEETS_CONFIG.sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
             try {
-                const res = await fetch(url);
+                const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEETS.id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`);
                 const txt = await res.text();
                 const json = JSON.parse(txt.substring(47).slice(0,-2));
-                if (!json.table?.rows) return [];
                 const headers = json.table.cols.map(c => c.label || '');
-                return json.table.rows.map(r => {
+                return json.table.rows?.map(r => {
                     const o = {};
                     r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; });
                     return o;
-                });
+                }) || [];
             } catch { return []; }
+        };
+
+        // ============================================
+        // SESSIONS
+        // ============================================
+        const SESSIONS = {
+            easyRun: (mins, km) => ({
+                type: 'Easy Run', zone: 2, duration: mins, distance: km,
+                purpose: 'Build aerobic base and promote recovery',
+                structure: [
+                    { block: 'Warm-up', time: '5 min', note: 'Walk to easy jog' },
+                    { block: 'Main', time: `${mins-10} min`, note: 'Conversational pace, HR 130-145' },
+                    { block: 'Cool-down', time: '5 min', note: 'Easy jog to walk' },
+                ],
+                targets: { hr: '130-145 bpm', pace: '5:30-6:30/km', feel: 'RPE 4-5, can chat easily' }
+            }),
+            longRun: (mins) => ({
+                type: 'Long Run', zone: 2, duration: mins, distance: Math.round(mins/6),
+                purpose: 'Maximize aerobic adaptations and build endurance',
+                structure: [
+                    { block: 'Easy start', time: '15 min', note: 'Very relaxed, wake up the body' },
+                    { block: 'Main', time: `${mins-20} min`, note: 'Steady Z2, even effort throughout' },
+                    { block: 'Cool-down', time: '5 min', note: 'Easy to finish' },
+                ],
+                targets: { hr: '130-145 bpm', pace: '5:45-6:30/km', feel: 'RPE 5-6, finish strong' }
+            }),
+            threshold: (reps, repMins) => ({
+                type: 'Threshold', zone: 4, duration: reps * repMins + reps * 2 + 20,
+                purpose: 'Raise lactate threshold for faster sustainable pace',
+                structure: [
+                    { block: 'Warm-up', time: '10 min', note: 'Easy jog + 4×30s strides' },
+                    { block: 'Main', time: `${reps}×${repMins} min`, note: 'Threshold pace, 2min jog between' },
+                    { block: 'Cool-down', time: '10 min', note: 'Easy jog' },
+                ],
+                targets: { hr: '160-170 bpm', pace: '4:20-4:50/km', feel: 'RPE 7-8, comfortably hard' }
+            }),
+            vo2max: (reps, repMins) => ({
+                type: 'VO₂max Intervals', zone: 5, duration: reps * repMins + reps * 3 + 20,
+                purpose: 'Expand aerobic ceiling and top-end speed',
+                structure: [
+                    { block: 'Warm-up', time: '10 min', note: 'Easy + strides' },
+                    { block: 'Main', time: `${reps}×${repMins} min`, note: 'Hard effort, 3min easy between' },
+                    { block: 'Cool-down', time: '10 min', note: 'Easy jog' },
+                ],
+                targets: { hr: '170-185 bpm', pace: '3:50-4:20/km', feel: 'RPE 9, very hard' }
+            }),
+            strength: (focus) => ({
+                type: `Strength: ${focus}`, zone: 'STR', duration: 45,
+                purpose: focus === 'Lower' ? 'Build leg strength for sled and lunges' : 'Build upper body for ski, row, wall balls',
+                structure: [
+                    { block: 'Warm-up', time: '8 min', note: 'Bike/row + dynamic stretches' },
+                    { block: 'Strength', time: '30 min', note: 'See exercises' },
+                    { block: 'Cool-down', time: '7 min', note: 'Stretch + foam roll' },
+                ],
+                exercises: focus === 'Lower' 
+                    ? ['Back Squat 4×6-8', 'RDL 3×8-10', 'Walking Lunges 3×12', 'Leg Press 3×12-15', 'Calf Raises 3×15-20']
+                    : ['Pull-ups 4×6-10', 'DB Row 3×10', 'Push Press 3×8-10', 'Wall Balls 3×20', 'Ski Erg 3×250m']
+            }),
+            miniSim: (station) => ({
+                type: 'Mini-Sim', zone: 'SIM', duration: 30, distance: 4,
+                purpose: 'Practice running under fatigue, test pacing',
+                structure: [
+                    { block: 'Warm-up', time: '5 min', note: 'Easy jog' },
+                    { block: 'Round 1-4', time: '~24 min', note: `4× (1km run + ${station})` },
+                    { block: 'Cool-down', time: '5 min', note: 'Walk' },
+                ],
+                targets: { splits: '4:25-4:40/km', decay: '<5% slower on R4', total: '25:40' }
+            }),
+            rest: () => ({
+                type: 'Rest Day', zone: null, duration: 0,
+                purpose: 'Recovery is when adaptation happens',
+                structure: [
+                    { block: 'Option A', time: '0 min', note: 'Complete rest' },
+                    { block: 'Option B', time: '20 min', note: 'Walk + stretch' },
+                ],
+            }),
+        };
+
+        const getWeekPlan = (phase) => {
+            const plans = {
+                base: [
+                    { day: 'Mon', ...SESSIONS.easyRun(45, 7) },
+                    { day: 'Tue', ...SESSIONS.strength('Lower') },
+                    { day: 'Wed', ...SESSIONS.easyRun(40, 6) },
+                    { day: 'Thu', ...SESSIONS.easyRun(45, 7) },
+                    { day: 'Fri', ...SESSIONS.strength('Upper') },
+                    { day: 'Sat', ...SESSIONS.longRun(75) },
+                    { day: 'Sun', ...SESSIONS.rest() },
+                ],
+                build: [
+                    { day: 'Mon', ...SESSIONS.easyRun(50, 8) },
+                    { day: 'Tue', ...SESSIONS.strength('Lower') },
+                    { day: 'Wed', ...SESSIONS.easyRun(45, 7) },
+                    { day: 'Thu', ...SESSIONS.vo2max(5, 4) },
+                    { day: 'Fri', ...SESSIONS.strength('Upper') },
+                    { day: 'Sat', ...SESSIONS.longRun(100) },
+                    { day: 'Sun', ...SESSIONS.threshold(3, 8) },
+                ],
+                specific: [
+                    { day: 'Mon', ...SESSIONS.easyRun(50, 8) },
+                    { day: 'Tue', ...SESSIONS.strength('Lower') },
+                    { day: 'Wed', ...SESSIONS.easyRun(45, 7) },
+                    { day: 'Thu', ...SESSIONS.vo2max(5, 4) },
+                    { day: 'Fri', ...SESSIONS.rest() },
+                    { day: 'Sat', ...SESSIONS.longRun(90) },
+                    { day: 'Sun', ...SESSIONS.miniSim('Row 500m') },
+                ],
+            };
+            return plans[phase] || plans.base;
         };
 
         // ============================================
         // COMPONENTS
         // ============================================
         
-        // Performance Ring
-        const Ring = ({ progress, color, size, strokeWidth = 8 }) => {
-            const r = (size - strokeWidth) / 2;
+        // Score Arc
+        const ScoreArc = ({ value, max = 100, color = 'var(--accent)', size = 80 }) => {
+            const r = (size - 8) / 2;
             const circ = 2 * Math.PI * r;
-            const offset = circ - (Math.min(100, Math.max(0, progress)) / 100) * circ;
+            const pct = Math.min(100, Math.max(0, (value / max) * 100));
+            const offset = circ - (pct / 100) * circ;
+            
             return (
-                <svg width={size} height={size} className="svg-ring">
-                    <circle className="ring-bg" cx={size/2} cy={size/2} r={r} strokeWidth={strokeWidth} />
-                    <circle className="ring-progress" cx={size/2} cy={size/2} r={r} strokeWidth={strokeWidth} 
-                        stroke={color} strokeDasharray={circ} strokeDashoffset={offset} />
-                </svg>
+                <div className="score-container" style={{ width: size, height: size }}>
+                    <svg width={size} height={size} className="score-arc">
+                        <circle className="bg" cx={size/2} cy={size/2} r={r} strokeWidth="6" />
+                        <circle className="progress" cx={size/2} cy={size/2} r={r} strokeWidth="6"
+                            stroke={color} strokeDasharray={circ} strokeDashoffset={offset} />
+                    </svg>
+                    <div className="score-value" style={{ color }}>{Math.round(value)}</div>
+                </div>
             );
         };
 
-        // Four-ring display (Oura style)
-        const PerformanceRings = ({ scores }) => (
-            <div className="ring-container" style={{ width: 240, height: 240 }}>
-                <div style={{ position: 'absolute', top: 0, left: 20 }}>
-                    <Ring progress={scores.aerobic} color="var(--accent-green)" size={200} strokeWidth={12} />
+        // Metric Card
+        const MetricCard = ({ title, value, unit, insight, gradient, color, onClick, trend }) => (
+            <div className={`card card-metric aurora ${gradient}`} onClick={onClick}>
+                <div>
+                    <p className="label" style={{ marginBottom: 8 }}>{title}</p>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                        <span className="value-large" style={{ color }}>{value}</span>
+                        {unit && <span className="value-unit">{unit}</span>}
+                    </div>
+                    {trend && (
+                        <span className={`trend ${trend.dir}`} style={{ marginTop: 4, display: 'inline-flex' }}>
+                            {trend.dir === 'up' ? '↑' : trend.dir === 'down' ? '↓' : '→'} {trend.text}
+                        </span>
+                    )}
                 </div>
-                <div style={{ position: 'absolute', top: 20, left: 40 }}>
-                    <Ring progress={scores.threshold} color="var(--accent-orange)" size={160} strokeWidth={12} />
-                </div>
-                <div style={{ position: 'absolute', top: 40, left: 60 }}>
-                    <Ring progress={scores.speed} color="var(--accent-red)" size={120} strokeWidth={12} />
-                </div>
-                <div style={{ position: 'absolute', top: 60, left: 80 }}>
-                    <Ring progress={scores.functional} color="var(--accent-purple)" size={80} strokeWidth={12} />
-                </div>
-                <div style={{ position: 'absolute', top: 95, left: 0, right: 0, textAlign: 'center' }}>
-                    <p className="text-4xl font-bold">{Math.round((scores.aerobic + scores.threshold + scores.speed + scores.functional) / 4)}</p>
-                    <p className="text-xs text-secondary uppercase tracking-wider">Overall</p>
-                </div>
+                <p className="insight">{insight}</p>
             </div>
         );
 
         // Session Card
-        const SessionCard = ({ session, day, isToday, onClick }) => {
-            const zoneClass = session.zone === 'strength' ? 'zone-strength' : 
-                              session.zone === 'sim' ? 'zone-sim' : 
-                              session.zone === 'rest' ? 'zone-rest' :
-                              session.zone ? `zone-${session.zone}` : '';
-            return (
-                <div className={`session-card ${isToday ? 'is-today' : ''}`} onClick={onClick}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-                        <div>
-                            <p className="text-xs text-secondary" style={{ marginBottom: 4 }}>{day}</p>
-                            <p className="font-semibold">{session.name}</p>
+        const SessionCard = ({ session, isToday, onClick }) => (
+            <div className={`card session-card aurora gradient-session`} onClick={onClick}>
+                <div className="session-type">
+                    {session.zone === 2 ? '🟢 Z2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'STR' ? '💪 Strength' : session.zone === 'SIM' ? '🏁 Simulation' : '😴 Recovery'}
+                </div>
+                <p className="session-name">{session.type}</p>
+                <p className="session-detail">
+                    {session.duration > 0 ? `${session.duration} min` : 'Rest day'}
+                    {session.distance > 0 && ` · ${session.distance}km`}
+                    {isToday && ' · Today'}
+                </p>
+                <div style={{ position: 'absolute', bottom: 20, right: 20, opacity: 0.4 }}>→</div>
+            </div>
+        );
+
+        // ============================================
+        // DETAIL VIEWS
+        // ============================================
+        const RecoveryDetail = ({ data, onClose }) => (
+            <div className="modal-overlay open" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-handle" />
+                    <div className={`detail-header gradient-recovery aurora`}>
+                        <button className="detail-back" onClick={onClose}>←</button>
+                        <p className="label" style={{ marginBottom: 8 }}>RECOVERY</p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontSize: 56, fontWeight: 300 }}>{data.score}</span>
+                            <span style={{ fontSize: 20, opacity: 0.6 }}>/ 100</span>
                         </div>
-                        {session.zone && session.zone !== 'rest' && (
-                            <span className={`zone-badge ${zoneClass}`}>
-                                {session.zone === 'strength' ? 'STR' : session.zone === 'sim' ? 'SIM' : `Z${session.zone}`}
-                            </span>
-                        )}
+                        <p style={{ fontSize: 18, marginTop: 8, color: 'var(--text-secondary)' }}>{data.insight}</p>
                     </div>
-                    <p className="text-sm text-secondary" style={{ marginBottom: 8 }}>{session.desc}</p>
-                    <div style={{ display: 'flex', gap: 16 }} className="text-sm text-tertiary">
-                        {session.duration > 0 && <span>{formatDuration(session.duration)}</span>}
-                        {session.distance > 0 && <span>{session.distance}km</span>}
+                    <div style={{ padding: '24px' }}>
+                        <p className="label" style={{ marginBottom: 16 }}>CONTRIBUTING FACTORS</p>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Resting Heart Rate</p>
+                                <p className="insight">vs {data.hrBaseline} baseline</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.restingHR} <span style={{ fontSize: 14, opacity: 0.6 }}>bpm</span></p>
+                                <span className={`trend ${data.restingHR <= data.hrBaseline ? 'up' : 'down'}`}>
+                                    {data.restingHR <= data.hrBaseline ? '✓ Good' : '↑ Elevated'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Heart Rate Variability</p>
+                                <p className="insight">Higher is better</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.hrv} <span style={{ fontSize: 14, opacity: 0.6 }}>ms</span></p>
+                                <span className={`trend ${data.hrv >= 50 ? 'up' : data.hrv >= 35 ? 'neutral' : 'down'}`}>
+                                    {data.hrv >= 50 ? '✓ Strong' : data.hrv >= 35 ? '→ Normal' : '↓ Low'}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Sleep</p>
+                                <p className="insight">Data from Apple Watch</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.sleep > 0 ? `${data.sleep.toFixed(1)}h` : '—'}</p>
+                                <span className={`trend ${data.sleep >= 7 ? 'up' : data.sleep >= 6 ? 'neutral' : 'down'}`}>
+                                    {data.sleep >= 7 ? '✓ Good' : data.sleep >= 6 ? '→ Okay' : data.sleep > 0 ? '↓ Low' : 'No data'}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: 24, padding: 16, background: 'rgba(0,212,170,0.1)', borderRadius: 12 }}>
+                            <p style={{ fontWeight: 500, color: 'var(--accent)', marginBottom: 8 }}>💡 What this means</p>
+                            <p className="insight">{data.recommendation}</p>
+                        </div>
                     </div>
                 </div>
-            );
-        };
+            </div>
+        );
 
-        // Session Detail Modal
-        const SessionModal = ({ session, onClose }) => {
-            if (!session) return null;
-            return (
-                <div className="modal-overlay" onClick={onClose}>
-                    <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-                        <div className="modal-handle" />
-                        <div style={{ padding: 20 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                                <div>
-                                    <h2 className="text-xl font-bold">{session.name}</h2>
-                                    <p className="text-secondary">{session.duration > 0 ? formatDuration(session.duration) : 'Rest day'}</p>
-                                </div>
-                                {session.zone && session.zone !== 'rest' && (
-                                    <span className={`zone-badge ${session.zone === 'strength' ? 'zone-strength' : session.zone === 'sim' ? 'zone-sim' : `zone-${session.zone}`}`}>
-                                        {session.zone === 'strength' ? 'STRENGTH' : session.zone === 'sim' ? 'SIMULATION' : `ZONE ${session.zone}`}
-                                    </span>
-                                )}
+        const AerobicDetail = ({ data, onClose }) => (
+            <div className="modal-overlay open" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-handle" />
+                    <div className={`detail-header gradient-aerobic aurora`}>
+                        <button className="detail-back" onClick={onClose}>←</button>
+                        <p className="label" style={{ marginBottom: 8 }}>AEROBIC ENGINE</p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontSize: 56, fontWeight: 300 }}>{data.vo2max.toFixed(1)}</span>
+                            <span style={{ fontSize: 20, opacity: 0.6 }}>VO₂max</span>
+                        </div>
+                        <p style={{ fontSize: 18, marginTop: 8, color: 'var(--text-secondary)' }}>{data.insight}</p>
+                    </div>
+                    <div style={{ padding: '24px' }}>
+                        <p className="label" style={{ marginBottom: 16 }}>CONTRIBUTING FACTORS</p>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>VO₂max Estimate</p>
+                                <p className="insight">From Apple Watch</p>
                             </div>
-
-                            {/* Purpose */}
-                            <div className="glass-card-subtle" style={{ padding: 16, marginBottom: 16 }}>
-                                <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 8 }}>Purpose</p>
-                                <p className="text-sm">{session.purpose}</p>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.vo2max.toFixed(1)}</p>
+                                <span className="trend neutral">Target: {TARGETS.vo2max}</span>
                             </div>
-
-                            {/* Structure */}
-                            <div style={{ marginBottom: 16 }}>
-                                <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Session Structure</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                    {session.structure?.map((block, i) => (
-                                        <div key={i} className="glass-card-subtle" style={{ padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-                                            <div style={{ 
-                                                width: 48, height: 48, borderRadius: 12, 
-                                                background: 'rgba(255,255,255,0.05)', 
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                fontSize: 13, fontWeight: 600
-                                            }}>
-                                                {block.time}
-                                            </div>
-                                            <div style={{ flex: 1 }}>
-                                                <p className="font-medium">{block.name}</p>
-                                                <p className="text-sm text-secondary">{block.detail}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
+                        </div>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Weekly Volume</p>
+                                <p className="insight">Running distance</p>
                             </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.weeklyVol.toFixed(1)} <span style={{ fontSize: 14, opacity: 0.6 }}>km</span></p>
+                                <span className={`trend ${data.weeklyVol >= TARGETS.weeklyVol ? 'up' : 'neutral'}`}>
+                                    Target: {TARGETS.weeklyVol}km
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Z2 Sessions</p>
+                                <p className="insight">This week</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.z2Sessions}</p>
+                            </div>
+                        </div>
 
-                            {/* Exercises (for strength) */}
-                            {session.exercises && (
-                                <div style={{ marginBottom: 16 }}>
-                                    <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Exercises</p>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                                        {session.exercises.map((ex, i) => (
-                                            <div key={i} className="glass-card-subtle" style={{ padding: 12, display: 'flex', justifyContent: 'space-between' }}>
-                                                <span className="font-medium">{ex.name}</span>
-                                                <span className="text-secondary">{ex.sets}</span>
-                                            </div>
-                                        ))}
+                        <div style={{ marginTop: 24, padding: 16, background: 'rgba(0,212,170,0.1)', borderRadius: 12 }}>
+                            <p style={{ fontWeight: 500, color: 'var(--accent)', marginBottom: 8 }}>📊 Research</p>
+                            <p className="insight">Brownlee study: +100km monthly volume = -4.4 minutes race time. Volume is the #1 predictor of endurance performance.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const RaceFitnessDetail = ({ data, onClose, onLogTest }) => (
+            <div className="modal-overlay open" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-handle" />
+                    <div className={`detail-header gradient-race aurora`}>
+                        <button className="detail-back" onClick={onClose}>←</button>
+                        <p className="label" style={{ marginBottom: 8 }}>RACE FITNESS</p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontSize: 56, fontWeight: 300 }}>{data.predicted}</span>
+                        </div>
+                        <p style={{ fontSize: 18, marginTop: 8, color: 'var(--text-secondary)' }}>{data.insight}</p>
+                    </div>
+                    <div style={{ padding: '24px' }}>
+                        <p className="label" style={{ marginBottom: 16 }}>BENCHMARK TESTS</p>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>2km Time Trial</p>
+                                <p className="insight">{data.twoKmDate || 'Not tested yet'}</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.twoKm ? formatTime(data.twoKm) : '—'}</p>
+                                <span className="trend neutral">Target: {formatTime(TARGETS.twoKm)}</span>
+                            </div>
+                        </div>
+                        
+                        <div className="data-row">
+                            <div>
+                                <p style={{ fontWeight: 500 }}>Threshold Pace</p>
+                                <p className="insight">{data.thresholdDate || 'Not tested yet'}</p>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <p style={{ fontSize: 20, fontWeight: 600 }}>{data.threshold ? formatPace(data.threshold) : '—'}</p>
+                                <span className="trend neutral">Target: {formatPace(TARGETS.threshold)}</span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginTop: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                            <button onClick={() => onLogTest('twoKm')} style={{ padding: '14px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', cursor: 'pointer' }}>
+                                Log 2km TT
+                            </button>
+                            <button onClick={() => onLogTest('threshold')} style={{ padding: '14px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', cursor: 'pointer' }}>
+                                Log 20-min Test
+                            </button>
+                        </div>
+
+                        <div style={{ marginTop: 24, padding: 16, background: 'rgba(245,166,35,0.1)', borderRadius: 12 }}>
+                            <p style={{ fontWeight: 500, color: 'var(--accent-warm)', marginBottom: 8 }}>🎯 Path to 1:05</p>
+                            <p className="insight">Your 2km and threshold tests predict race performance. Test every 4 weeks to track progress.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+
+        const HyroxReadyDetail = ({ data, onClose, onLogTest }) => (
+            <div className="modal-overlay open" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-handle" />
+                    <div className={`detail-header gradient-hyrox aurora`}>
+                        <button className="detail-back" onClick={onClose}>←</button>
+                        <p className="label" style={{ marginBottom: 8 }}>HYROX READY</p>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                            <span style={{ fontSize: 56, fontWeight: 300 }}>{data.simTime ? formatTime(data.simTime) : '—'}</span>
+                        </div>
+                        <p style={{ fontSize: 18, marginTop: 8, color: 'var(--text-secondary)' }}>{data.insight}</p>
+                    </div>
+                    <div style={{ padding: '24px' }}>
+                        <p className="label" style={{ marginBottom: 16 }}>MINI-SIM RESULTS</p>
+                        
+                        {data.lastSim ? (
+                            <>
+                                <div className="data-row">
+                                    <div>
+                                        <p style={{ fontWeight: 500 }}>Last Mini-Sim</p>
+                                        <p className="insight">{data.lastSim.date} · {data.lastSim.station}</p>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <p style={{ fontSize: 20, fontWeight: 600 }}>{formatTime(data.lastSim.total)}</p>
+                                        <span className="trend neutral">Target: 25:40</span>
                                     </div>
                                 </div>
-                            )}
-
-                            {/* Targets */}
-                            <div style={{ marginBottom: 16 }}>
-                                <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Targets</p>
-                                <div className="glass-card-subtle" style={{ padding: 16 }}>
-                                    {Object.entries(session.targets || {}).map(([k, v]) => (
-                                        <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                                            <span className="text-secondary" style={{ textTransform: 'capitalize' }}>{k}</span>
-                                            <span className="font-medium">{v}</span>
-                                        </div>
-                                    ))}
+                                <div className="data-row">
+                                    <div>
+                                        <p style={{ fontWeight: 500 }}>Pace Decay</p>
+                                        <p className="insight">R4 vs R1 (lower is better)</p>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <p style={{ fontSize: 20, fontWeight: 600 }}>{data.lastSim.decay}%</p>
+                                        <span className={`trend ${parseFloat(data.lastSim.decay) <= 5 ? 'up' : 'down'}`}>
+                                            {parseFloat(data.lastSim.decay) <= 5 ? '✓ Good' : '↑ Work on fatigue resistance'}
+                                        </span>
+                                    </div>
                                 </div>
+                            </>
+                        ) : (
+                            <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-secondary)' }}>
+                                <p>No mini-sim logged yet</p>
+                                <p style={{ fontSize: 13, marginTop: 8 }}>Complete a 4×(1km + station) workout to track your HYROX-specific fitness</p>
                             </div>
+                        )}
 
-                            {/* Research */}
-                            {session.research && (
-                                <div className="glass-card-subtle" style={{ 
-                                    padding: 16, 
-                                    background: 'rgba(10, 132, 255, 0.1)', 
-                                    borderColor: 'rgba(10, 132, 255, 0.3)' 
-                                }}>
-                                    <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--accent-blue)', marginBottom: 8 }}>📚 Research</p>
-                                    <p className="text-sm">{session.research}</p>
-                                </div>
-                            )}
+                        <button onClick={() => onLogTest('miniSim')} style={{ marginTop: 24, width: '100%', padding: '16px', background: 'var(--accent-purple)', border: 'none', borderRadius: 12, color: 'white', fontWeight: 600, cursor: 'pointer' }}>
+                            Log Mini-Sim
+                        </button>
 
-                            <button className="btn-primary" style={{ marginTop: 20 }} onClick={onClose}>Got it</button>
+                        <div style={{ marginTop: 24, padding: 16, background: 'rgba(155,89,182,0.1)', borderRadius: 12 }}>
+                            <p style={{ fontWeight: 500, color: 'var(--accent-purple)', marginBottom: 8 }}>🏋️ Why Mini-Sims?</p>
+                            <p className="insight">HYROX is about running under fatigue. Mini-sims test your ability to maintain pace after stations — the key differentiator on race day.</p>
                         </div>
                     </div>
                 </div>
-            );
-        };
+            </div>
+        );
 
-        // Test Modal
+        const SessionDetail = ({ session, onClose }) => (
+            <div className="modal-overlay open" onClick={onClose}>
+                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                    <div className="modal-handle" />
+                    <div className={`detail-header gradient-session aurora`}>
+                        <button className="detail-back" onClick={onClose}>←</button>
+                        <div className="session-type" style={{ marginBottom: 12 }}>
+                            {session.zone === 2 ? '🟢 Z2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'STR' ? '💪 Strength' : session.zone === 'SIM' ? '🏁 Sim' : '😴 Rest'}
+                        </div>
+                        <p style={{ fontSize: 32, fontWeight: 600 }}>{session.type}</p>
+                        <p style={{ fontSize: 16, color: 'var(--text-secondary)', marginTop: 8 }}>
+                            {session.duration > 0 ? `${session.duration} min` : 'Rest day'}
+                            {session.distance > 0 && ` · ${session.distance}km`}
+                        </p>
+                    </div>
+                    <div style={{ padding: '24px' }}>
+                        <div style={{ padding: 16, background: 'rgba(255,255,255,0.05)', borderRadius: 12, marginBottom: 24 }}>
+                            <p style={{ fontWeight: 500, marginBottom: 8 }}>Purpose</p>
+                            <p className="insight">{session.purpose}</p>
+                        </div>
+
+                        <p className="label" style={{ marginBottom: 16 }}>SESSION STRUCTURE</p>
+                        {session.structure?.map((s, i) => (
+                            <div key={i} className="data-row">
+                                <div>
+                                    <p style={{ fontWeight: 500 }}>{s.block}</p>
+                                    <p className="insight">{s.note}</p>
+                                </div>
+                                <p style={{ fontWeight: 600, opacity: 0.7 }}>{s.time}</p>
+                            </div>
+                        ))}
+
+                        {session.exercises && (
+                            <>
+                                <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>EXERCISES</p>
+                                {session.exercises.map((ex, i) => (
+                                    <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--card-border)' }}>
+                                        <p>{ex}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+
+                        {session.targets && (
+                            <>
+                                <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>TARGETS</p>
+                                {Object.entries(session.targets).map(([k, v]) => (
+                                    <div key={k} className="data-row">
+                                        <p style={{ textTransform: 'capitalize' }}>{k}</p>
+                                        <p style={{ fontWeight: 500 }}>{v}</p>
+                                    </div>
+                                ))}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+
+        // Test Input Modal
         const TestModal = ({ type, onClose, onSave }) => {
-            const [time, setTime] = useState('');
-            const [distance, setDistance] = useState('');
+            const [value, setValue] = useState('');
             const [station, setStation] = useState('Row 500m');
-            const [rounds, setRounds] = useState([{run:'',st:''},{run:'',st:''},{run:'',st:''},{run:'',st:''}]);
+            const [rounds, setRounds] = useState([{r:'',s:''},{r:'',s:''},{r:'',s:''},{r:'',s:''}]);
 
             const handleSave = () => {
                 const date = new Date().toISOString().split('T')[0];
-                if (type === 'twoKm' && parseTime(time) > 0) {
-                    onSave({ type: 'twoKm', date, time: parseTime(time) });
-                } else if (type === 'threshold' && parseFloat(distance) > 0) {
-                    const d = parseFloat(distance);
-                    onSave({ type: 'threshold', date, distance: d, avgPace: Math.round(1200 / d) });
+                if (type === 'twoKm') {
+                    onSave({ type: 'twoKm', date, time: parseTime(value) });
+                } else if (type === 'threshold') {
+                    const d = parseFloat(value);
+                    onSave({ type: 'threshold', date, distance: d, pace: Math.round(1200/d) });
                 } else if (type === 'miniSim') {
-                    const parsed = rounds.map(r => ({ run: parseTime(r.run), st: parseTime(r.st) }));
-                    const total = parsed.reduce((s, r) => s + r.run + r.st, 0);
-                    if (total > 0) onSave({ type: 'miniSim', date, station, rounds: parsed, total });
+                    const parsed = rounds.map(r => ({ run: parseTime(r.r), st: parseTime(r.s) }));
+                    const total = parsed.reduce((s,r) => s + r.run + r.st, 0);
+                    const decay = parsed[0].run > 0 ? ((parsed[3].run - parsed[0].run) / parsed[0].run * 100).toFixed(1) : 0;
+                    onSave({ type: 'miniSim', date, station, rounds: parsed, total, decay });
                 }
                 onClose();
             };
 
             return (
-                <div className="modal-overlay" onClick={onClose}>
+                <div className="modal-overlay open" onClick={onClose}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-handle" />
-                        <div style={{ padding: 20 }}>
-                            <h2 className="text-xl font-bold" style={{ marginBottom: 20 }}>
+                        <div style={{ padding: 24 }}>
+                            <h2 style={{ fontSize: 24, marginBottom: 24 }}>
                                 {type === 'twoKm' ? 'Log 2km Time Trial' : type === 'threshold' ? 'Log 20-min Test' : 'Log Mini-Sim'}
                             </h2>
 
                             {type === 'twoKm' && (
                                 <div>
-                                    <label className="text-xs text-secondary uppercase">Time (m:ss)</label>
-                                    <input type="text" placeholder="9:00" value={time} onChange={e => setTime(e.target.value)} style={{ marginTop: 8 }} />
+                                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>Time (m:ss)</label>
+                                    <input type="text" placeholder="9:00" value={value} onChange={e => setValue(e.target.value)}
+                                        style={{ width: '100%', padding: '14px 16px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', fontSize: 17 }} />
                                 </div>
                             )}
 
                             {type === 'threshold' && (
                                 <div>
-                                    <label className="text-xs text-secondary uppercase">Distance covered (km)</label>
-                                    <input type="number" step="0.01" placeholder="4.50" value={distance} onChange={e => setDistance(e.target.value)} style={{ marginTop: 8 }} />
-                                    <p className="text-sm text-secondary" style={{ marginTop: 8 }}>Run as far as you can in exactly 20 minutes.</p>
+                                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>Distance in 20 min (km)</label>
+                                    <input type="number" step="0.01" placeholder="4.50" value={value} onChange={e => setValue(e.target.value)}
+                                        style={{ width: '100%', padding: '14px 16px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', fontSize: 17 }} />
                                 </div>
                             )}
 
                             {type === 'miniSim' && (
                                 <div>
-                                    <label className="text-xs text-secondary uppercase">Station</label>
-                                    <select value={station} onChange={e => setStation(e.target.value)} style={{ marginTop: 8, marginBottom: 16 }}>
+                                    <label style={{ fontSize: 13, color: 'var(--text-secondary)', display: 'block', marginBottom: 8 }}>Station</label>
+                                    <select value={station} onChange={e => setStation(e.target.value)}
+                                        style={{ width: '100%', padding: '14px 16px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', fontSize: 17, marginBottom: 16 }}>
                                         <option>Row 500m</option>
                                         <option>Wall Balls ×30</option>
                                         <option>Ski Erg 500m</option>
                                         <option>Burpees ×15</option>
                                     </select>
                                     {rounds.map((r, i) => (
-                                        <div key={i} className="glass-card-subtle" style={{ padding: 12, marginBottom: 8 }}>
-                                            <p className="text-xs text-secondary" style={{ marginBottom: 8 }}>Round {i+1}</p>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                                                <input type="text" placeholder="1km (4:30)" value={r.run} 
-                                                    onChange={e => { const n = [...rounds]; n[i].run = e.target.value; setRounds(n); }} />
-                                                <input type="text" placeholder="Station (1:45)" value={r.st}
-                                                    onChange={e => { const n = [...rounds]; n[i].st = e.target.value; setRounds(n); }} />
-                                            </div>
+                                        <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                                            <input type="text" placeholder={`R${i+1} 1km`} value={r.r} onChange={e => { const n=[...rounds]; n[i].r=e.target.value; setRounds(n); }}
+                                                style={{ padding: '12px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 10, color: 'white', fontSize: 15 }} />
+                                            <input type="text" placeholder="Station" value={r.s} onChange={e => { const n=[...rounds]; n[i].s=e.target.value; setRounds(n); }}
+                                                style={{ padding: '12px', background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 10, color: 'white', fontSize: 15 }} />
                                         </div>
                                     ))}
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                                <button className="btn-secondary" style={{ flex: 1 }} onClick={onClose}>Cancel</button>
-                                <button className="btn-primary" style={{ flex: 1 }} onClick={handleSave}>Save</button>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 24 }}>
+                                <button onClick={onClose} style={{ padding: 16, background: 'var(--card)', border: '1px solid var(--card-border)', borderRadius: 12, color: 'white', cursor: 'pointer' }}>Cancel</button>
+                                <button onClick={handleSave} style={{ padding: 16, background: 'var(--accent)', border: 'none', borderRadius: 12, color: 'black', fontWeight: 600, cursor: 'pointer' }}>Save</button>
                             </div>
                         </div>
                     </div>
@@ -885,390 +949,241 @@
         // MAIN APP
         // ============================================
         function App() {
-            const [tab, setTab] = useState('today');
-            const [loading, setLoading] = useState(true);
-            const [lastSync, setLastSync] = useState(null);
+            const [tab, setTab] = useState('home');
             const [workouts, setWorkouts] = useState([]);
-            const [dailyMetrics, setDailyMetrics] = useState([]);
-            const [selectedSession, setSelectedSession] = useState(null);
-            const [testModal, setTestModal] = useState(null);
-            const [showSettings, setShowSettings] = useState(false);
-
+            const [daily, setDaily] = useState([]);
             const [tests, setTests] = useState(() => storage.get('tests', { twoKm: [], threshold: [], miniSim: [] }));
-            const [profile, setProfile] = useState(() => storage.get('profile', {
-                name: 'Lad',
-                startDate: '2026-02-10',
-                bRaceDate: '2026-08-15',
-                aRaceDate: '2027-04-15',
-                targetTime: '1:05:00',
-                currentPB: '1:17:18',
-                restingHR: 55,
-            }));
+            const [profile] = useState(() => storage.get('profile', { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15' }));
+            const [modal, setModal] = useState(null);
+            const [testModal, setTestModal] = useState(null);
 
             useEffect(() => { storage.set('tests', tests); }, [tests]);
-            useEffect(() => { storage.set('profile', profile); }, [profile]);
 
-            const sync = useCallback(async () => {
-                setLoading(true);
-                const [w, d] = await Promise.all([fetchSheet('Workouts'), fetchSheet('DailyMetrics')]);
-                setWorkouts(w.filter(x => x['Date']));
-                setDailyMetrics(d.filter(x => x['Date']));
-                setLastSync(new Date());
-                setLoading(false);
+            useEffect(() => {
+                Promise.all([fetchSheet('Workouts'), fetchSheet('DailyMetrics')]).then(([w, d]) => {
+                    setWorkouts(w.filter(x => x['Date']));
+                    setDaily(d.filter(x => x['Date']));
+                });
             }, []);
 
-            useEffect(() => { sync(); }, [sync]);
-
             const now = Date.now();
-            const currentWeek = useMemo(() => {
-                const start = new Date(profile.startDate);
-                return Math.max(1, Math.floor((now - start) / (7*24*60*60*1000)) + 1);
-            }, [profile.startDate, now]);
+            const weekAgo = now - 7*24*60*60*1000;
 
-            const phase = useMemo(() => getPhaseForWeek(currentWeek), [currentWeek]);
-            const targetVol = useMemo(() => getVolumeForWeek(currentWeek), [currentWeek]);
-            const daysToA = Math.max(0, Math.floor((new Date(profile.aRaceDate) - now) / 86400000));
-            const daysToB = Math.max(0, Math.floor((new Date(profile.bRaceDate) - now) / 86400000));
-
-            const weeklyVol = useMemo(() => {
-                const weekAgo = now - 7*24*60*60*1000;
-                return workouts.filter(w => new Date(w['Date']) >= weekAgo)
-                    .reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
-            }, [workouts, now]);
-
-            const latestVo2 = useMemo(() => {
-                const sorted = [...dailyMetrics].sort((a,b) => new Date(b['Date']) - new Date(a['Date']));
-                return sorted.find(d => d['VO2 Max'])?.['VO2 Max'] || 43.5;
-            }, [dailyMetrics]);
-
-            const latestHR = useMemo(() => {
-                const sorted = [...dailyMetrics].sort((a,b) => new Date(b['Date']) - new Date(a['Date']));
-                return sorted.find(d => d['Resting HR'])?.['Resting HR'] || profile.restingHR;
-            }, [dailyMetrics, profile.restingHR]);
-
-            const scores = useMemo(() => {
-                const t2k = tests.twoKm[tests.twoKm.length-1]?.time || BASELINES.twoKmTime;
-                const thr = tests.threshold[tests.threshold.length-1]?.avgPace || BASELINES.thresholdPace;
-                const sim = tests.miniSim[tests.miniSim.length-1]?.total || BASELINES.miniSimTotal;
+            // Latest metrics
+            const latestDaily = useMemo(() => {
+                const sorted = [...daily].sort((a,b) => new Date(b['Date']) - new Date(a['Date']));
                 return {
-                    aerobic: Math.min(100, Math.max(0, (latestVo2 - BASELINES.vo2max) / (TARGETS.vo2max - BASELINES.vo2max) * 100)),
-                    threshold: Math.min(100, Math.max(0, (BASELINES.thresholdPace - thr) / (BASELINES.thresholdPace - TARGETS.thresholdPace) * 100)),
-                    speed: Math.min(100, Math.max(0, (BASELINES.twoKmTime - t2k) / (BASELINES.twoKmTime - TARGETS.twoKmTime) * 100)),
-                    functional: Math.min(100, Math.max(0, (BASELINES.miniSimTotal - sim) / (BASELINES.miniSimTotal - TARGETS.miniSimTotal) * 100)),
+                    restingHR: sorted.find(d => d['Resting HR'])?.['Resting HR'] || 55,
+                    hrv: sorted.find(d => d['HRV (ms)'])?.['HRV (ms)'] || 0,
+                    vo2max: sorted.find(d => d['VO2 Max'])?.['VO2 Max'] || 43.5,
+                    sleep: sorted.find(d => d['Sleep Duration (hr)'])?.['Sleep Duration (hr)'] || 0,
                 };
-            }, [latestVo2, tests]);
+            }, [daily]);
 
-            const weekPlan = useMemo(() => {
-                const isDeload = currentWeek % 4 === 0;
-                const p = phase.id;
-                if (isDeload) return [
-                    { day: 'Mon', session: createSession('easyRun', { duration: 40, distance: 6 }) },
-                    { day: 'Tue', session: createSession('strengthA') },
-                    { day: 'Wed', session: createSession('rest') },
-                    { day: 'Thu', session: createSession('easyRun', { duration: 35, distance: 5.5 }) },
-                    { day: 'Fri', session: createSession('rest') },
-                    { day: 'Sat', session: createSession('longRun', { duration: 60 }) },
-                    { day: 'Sun', session: createSession('rest') },
-                ];
-                const plans = {
-                    base1: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Tue', session: createSession('strengthA') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 40, distance: 6 }) },
-                        { day: 'Thu', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Fri', session: createSession('strengthB') },
-                        { day: 'Sat', session: createSession('longRun', { duration: 75 }) },
-                        { day: 'Sun', session: createSession('rest') },
-                    ],
-                    base2: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 50, distance: 8 }) },
-                        { day: 'Tue', session: createSession('strengthA') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Thu', session: createSession('threshold', { reps: 4, repTime: 6, rest: 2 }) },
-                        { day: 'Fri', session: createSession('strengthB') },
-                        { day: 'Sat', session: createSession('longRun', { duration: 90 }) },
-                        { day: 'Sun', session: createSession('rest') },
-                    ],
-                    build1: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 50, distance: 8 }) },
-                        { day: 'Tue', session: createSession('strengthA') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Thu', session: createSession('vo2max', { reps: 5, repTime: 4, rest: 3 }) },
-                        { day: 'Fri', session: createSession('strengthB') },
-                        { day: 'Sat', session: createSession('longRun', { duration: 100 }) },
-                        { day: 'Sun', session: createSession('threshold', { reps: 3, repTime: 8, rest: 2 }) },
-                    ],
-                    build2: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 55, distance: 9 }) },
-                        { day: 'Tue', session: createSession('strengthA') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 50, distance: 8 }) },
-                        { day: 'Thu', session: createSession('vo2max', { reps: 6, repTime: 4, rest: 3 }) },
-                        { day: 'Fri', session: createSession('strengthB') },
-                        { day: 'Sat', session: createSession('longRun', { duration: 110 }) },
-                        { day: 'Sun', session: createSession('threshold', { reps: 4, repTime: 8, rest: 2 }) },
-                    ],
-                    specific: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 50, distance: 8 }) },
-                        { day: 'Tue', session: createSession('strengthA') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Thu', session: createSession('vo2max', { reps: 5, repTime: 4, rest: 3 }) },
-                        { day: 'Fri', session: createSession('rest') },
-                        { day: 'Sat', session: createSession('longRun', { duration: 90 }) },
-                        { day: 'Sun', session: createSession('miniSim', { station: 'Row 500m' }) },
-                    ],
-                    brace: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 45, distance: 7 }) },
-                        { day: 'Tue', session: createSession('threshold', { reps: 3, repTime: 5, rest: 2 }) },
-                        { day: 'Wed', session: createSession('rest') },
-                        { day: 'Thu', session: createSession('easyRun', { duration: 40, distance: 6 }) },
-                        { day: 'Fri', session: createSession('rest') },
-                        { day: 'Sat', session: createSession('miniSim', { station: 'Wall Balls ×30' }) },
-                        { day: 'Sun', session: createSession('rest') },
-                    ],
-                    recovery: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 30, distance: 4.5 }) },
-                        { day: 'Tue', session: createSession('rest') },
-                        { day: 'Wed', session: createSession('easyRun', { duration: 35, distance: 5 }) },
-                        { day: 'Thu', session: createSession('rest') },
-                        { day: 'Fri', session: createSession('easyRun', { duration: 30, distance: 4.5 }) },
-                        { day: 'Sat', session: createSession('longRun', { duration: 50 }) },
-                        { day: 'Sun', session: createSession('rest') },
-                    ],
-                    taper: [
-                        { day: 'Mon', session: createSession('easyRun', { duration: 35, distance: 5 }) },
-                        { day: 'Tue', session: createSession('vo2max', { reps: 3, repTime: 3, rest: 3 }) },
-                        { day: 'Wed', session: createSession('rest') },
-                        { day: 'Thu', session: createSession('easyRun', { duration: 30, distance: 4 }) },
-                        { day: 'Fri', session: createSession('rest') },
-                        { day: 'Sat', session: createSession('easyRun', { duration: 20, distance: 3 }) },
-                        { day: 'Sun', session: createSession('rest') },
-                    ],
-                };
-                return plans[p] || plans.base1;
-            }, [phase, currentWeek]);
+            const weeklyVol = useMemo(() => 
+                workouts.filter(w => new Date(w['Date']) >= weekAgo).reduce((s,w) => s + (parseFloat(w['Distance (km)']) || 0), 0)
+            , [workouts, weekAgo]);
 
+            const z2Sessions = useMemo(() => 
+                workouts.filter(w => new Date(w['Date']) >= weekAgo && (w['Workout Type']?.toLowerCase().includes('run') || w['Workout Type']?.toLowerCase().includes('walking'))).length
+            , [workouts, weekAgo]);
+
+            // Recovery score
+            const recoveryScore = useMemo(() => {
+                let score = 70;
+                const hrDiff = latestDaily.restingHR - profile.hrBaseline;
+                if (hrDiff <= 0) score += 15;
+                else if (hrDiff <= 3) score += 5;
+                else if (hrDiff > 5) score -= 15;
+                
+                if (latestDaily.hrv >= 50) score += 10;
+                else if (latestDaily.hrv >= 35) score += 0;
+                else if (latestDaily.hrv > 0) score -= 10;
+                
+                if (latestDaily.sleep >= 7) score += 5;
+                else if (latestDaily.sleep >= 6) score += 0;
+                else if (latestDaily.sleep > 0) score -= 5;
+                
+                return Math.max(0, Math.min(100, score));
+            }, [latestDaily, profile.hrBaseline]);
+
+            const recoveryInsight = recoveryScore >= 80 ? "You're recovered. Push hard today." : recoveryScore >= 60 ? "Moderate recovery. Train as planned." : "Recovery needed. Consider an easy day.";
+
+            // Test data
+            const latestTwoKm = tests.twoKm[tests.twoKm.length - 1];
+            const latestThreshold = tests.threshold[tests.threshold.length - 1];
+            const latestSim = tests.miniSim[tests.miniSim.length - 1];
+
+            // Predicted race time
+            const predictedTime = useMemo(() => {
+                const twoKm = latestTwoKm?.time || BASELINES.twoKm;
+                const threshold = latestThreshold?.pace || BASELINES.threshold;
+                const base = 75; // minutes
+                const twoKmFactor = (twoKm - 465) * 0.15;
+                const thresholdFactor = (threshold - 255) * 0.1;
+                return Math.round(base + twoKmFactor + thresholdFactor);
+            }, [latestTwoKm, latestThreshold]);
+
+            const raceInsight = predictedTime <= 65 ? "On track for 1:05!" : predictedTime <= 70 ? "Improving steadily" : predictedTime <= 75 ? "Building fitness" : "Keep training consistently";
+
+            // Week plan
+            const weekPlan = useMemo(() => getWeekPlan('base'), []);
             const todayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
-            const todaySession = weekPlan.find(d => d.day === todayName)?.session;
-            const handleTestSave = (result) => setTests(prev => ({...prev, [result.type]: [...prev[result.type], result]}));
+            const todaySession = weekPlan.find(d => d.day === todayName);
 
-            // RENDER: TODAY
-            const renderToday = () => (
-                <div className="hide-scrollbar" style={{ paddingBottom: 100 }}>
-                    <div style={{ padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                            <p className="text-xs text-secondary">{lastSync ? `Updated ${lastSync.toLocaleTimeString()}` : 'Syncing...'}</p>
-                            <h1 className="text-2xl font-bold">Hi {profile.name}</h1>
-                        </div>
-                        <button onClick={() => setShowSettings(true)} style={{ padding: 8, background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                        </button>
+            const daysToRace = Math.floor((new Date(profile.raceDate) - now) / 86400000);
+
+            const handleTestSave = (result) => {
+                setTests(prev => ({ ...prev, [result.type]: [...prev[result.type], result] }));
+            };
+
+            // ============================================
+            // HOME TAB
+            // ============================================
+            const renderHome = () => (
+                <div className="container hide-scrollbar">
+                    <div className="px-4 py-4">
+                        <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Welcome back</p>
+                        <h1 style={{ fontSize: 28, fontWeight: 600 }}>{profile.name}</h1>
                     </div>
-                    <div className="fade-in-up" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 0 30px' }}>
-                        <PerformanceRings scores={scores} />
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginTop: 24, width: '100%', padding: '0 20px' }}>
-                            {[{ label: 'Aerobic', color: 'var(--accent-green)', val: scores.aerobic },{ label: 'Threshold', color: 'var(--accent-orange)', val: scores.threshold },{ label: 'Speed', color: 'var(--accent-red)', val: scores.speed },{ label: 'Stations', color: 'var(--accent-purple)', val: scores.functional }].map((s, i) => (
-                                <div key={i} style={{ textAlign: 'center' }}>
-                                    <div style={{ width: 10, height: 10, borderRadius: 5, background: s.color, margin: '0 auto 4px' }} />
-                                    <p className="text-xs text-secondary">{s.label}</p>
-                                    <p className="text-sm font-semibold">{Math.round(s.val)}%</p>
-                                </div>
-                            ))}
+
+                    {/* Today's Session */}
+                    <div className="px-4 mb-4 fade-in">
+                        <p className="label" style={{ marginBottom: 12 }}>TODAY'S SESSION</p>
+                        <SessionCard session={todaySession} isToday onClick={() => setModal({ type: 'session', data: todaySession })} />
+                    </div>
+
+                    {/* Metric Cards */}
+                    <div className="px-4 mb-4">
+                        <div className="grid-2 fade-in delay-1">
+                            <MetricCard 
+                                title="Recovery" 
+                                value={recoveryScore} 
+                                insight={recoveryInsight}
+                                gradient="gradient-recovery"
+                                color="var(--accent-blue)"
+                                onClick={() => setModal({ type: 'recovery', data: { score: recoveryScore, insight: recoveryInsight, restingHR: latestDaily.restingHR, hrBaseline: profile.hrBaseline, hrv: latestDaily.hrv, sleep: latestDaily.sleep, recommendation: recoveryScore >= 80 ? "Your body has recovered well. Great day for a hard workout." : recoveryScore >= 60 ? "Decent recovery. Stick to the plan." : "Your body needs more rest. Consider swapping for an easy day or rest." }})}
+                            />
+                            <MetricCard 
+                                title="Aerobic Engine" 
+                                value={latestDaily.vo2max.toFixed(1)} 
+                                insight={latestDaily.vo2max >= 46 ? "Strong aerobic base" : latestDaily.vo2max >= 44 ? "Building steadily" : "Room to grow"}
+                                gradient="gradient-aerobic"
+                                color="var(--accent)"
+                                onClick={() => setModal({ type: 'aerobic', data: { vo2max: latestDaily.vo2max, weeklyVol, z2Sessions, insight: weeklyVol >= 40 ? "Good volume this week" : "Build more Z2 running" }})}
+                            />
                         </div>
                     </div>
-                    <div className="fade-in-up delay-1" style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <div className="glass-card" style={{ padding: 20 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <div className="px-4 mb-4">
+                        <div className="grid-2 fade-in delay-2">
+                            <MetricCard 
+                                title="Race Fitness" 
+                                value={`~${Math.floor(predictedTime/60)}:${String(predictedTime%60).padStart(2,'0')}`}
+                                insight={raceInsight}
+                                gradient="gradient-race"
+                                color="var(--accent-warm)"
+                                onClick={() => setModal({ type: 'raceFitness', data: { predicted: `~${Math.floor(predictedTime/60)}:${String(predictedTime%60).padStart(2,'0')}`, insight: raceInsight, twoKm: latestTwoKm?.time, twoKmDate: latestTwoKm?.date, threshold: latestThreshold?.pace, thresholdDate: latestThreshold?.date }})}
+                            />
+                            <MetricCard 
+                                title="HYROX Ready" 
+                                value={latestSim ? formatTime(latestSim.total) : '—'} 
+                                insight={latestSim ? `${latestSim.decay}% pace decay` : "Log a mini-sim"}
+                                gradient="gradient-hyrox"
+                                color="var(--accent-purple)"
+                                onClick={() => setModal({ type: 'hyroxReady', data: { simTime: latestSim?.total, insight: latestSim ? `Last: ${latestSim.station}` : "No mini-sim data yet", lastSim: latestSim }})}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Weekly Volume */}
+                    <div className="px-4 mb-4 fade-in delay-3">
+                        <div className="card" style={{ padding: 20 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+                                <p className="label">WEEKLY VOLUME</p>
+                                <p style={{ fontWeight: 600 }}>{weeklyVol.toFixed(1)} <span style={{ opacity: 0.5, fontWeight: 400 }}>/ {TARGETS.weeklyVol}km</span></p>
+                            </div>
+                            <div className="progress-bar">
+                                <div className="progress-fill" style={{ width: `${Math.min(100, weeklyVol/TARGETS.weeklyVol*100)}%`, background: weeklyVol >= TARGETS.weeklyVol ? 'var(--accent)' : 'var(--accent-blue)' }} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Race Countdown */}
+                    <div className="px-4 fade-in delay-4">
+                        <div className="card" style={{ padding: 20 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
-                                    <p className="text-xs text-secondary uppercase tracking-wider">A-Race: Malaga 2027</p>
-                                    <p className="text-4xl font-bold" style={{ marginTop: 4 }}>{daysToA}</p>
-                                    <p className="text-secondary">days to go</p>
+                                    <p className="label">MALAGA 2027</p>
+                                    <p style={{ fontSize: 32, fontWeight: 300, marginTop: 4 }}>{daysToRace} <span style={{ fontSize: 16, opacity: 0.5 }}>days</span></p>
                                 </div>
                                 <div style={{ textAlign: 'right' }}>
-                                    <p className="text-xs text-secondary">Target</p>
-                                    <p className="text-2xl font-bold" style={{ color: 'var(--accent-green)' }}>{profile.targetTime}</p>
-                                    <p className="text-xs text-secondary" style={{ marginTop: 8 }}>PB: {profile.currentPB}</p>
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Target</p>
+                                    <p style={{ fontSize: 24, fontWeight: 600, color: 'var(--accent)' }}>1:05:00</p>
                                 </div>
                             </div>
-                            {daysToB > 0 && daysToB < daysToA && (
-                                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                        <div><p className="text-xs text-secondary">B-Race</p><p className="font-semibold">{daysToB} days</p></div>
-                                        <p className="text-sm" style={{ color: 'var(--accent-orange)' }}>Target: 1:10-1:12</p>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // ============================================
+            // PLAN TAB
+            // ============================================
+            const renderPlan = () => (
+                <div className="container hide-scrollbar">
+                    <div className="px-4 py-4">
+                        <h1 style={{ fontSize: 28, fontWeight: 600 }}>This Week</h1>
+                        <p style={{ color: 'var(--text-secondary)' }}>Base Phase · Week 1</p>
+                    </div>
+                    <div className="px-4" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {weekPlan.map((item, i) => (
+                            <div key={i} className={`card`} style={{ padding: 16, cursor: 'pointer', border: item.day === todayName ? '1px solid var(--accent)' : '1px solid var(--card-border)' }} onClick={() => setModal({ type: 'session', data: item })}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>{item.day}{item.day === todayName && ' · Today'}</p>
+                                        <p style={{ fontWeight: 500 }}>{item.type}</p>
+                                    </div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        {item.duration > 0 && <p style={{ fontSize: 14 }}>{item.duration}min</p>}
+                                        {item.zone && <span style={{ fontSize: 11, padding: '2px 8px', background: item.zone === 2 ? 'rgba(0,212,170,0.2)' : item.zone === 4 ? 'rgba(245,166,35,0.2)' : item.zone === 5 ? 'rgba(231,76,60,0.2)' : 'rgba(155,89,182,0.2)', borderRadius: 10, color: item.zone === 2 ? 'var(--accent)' : item.zone === 4 ? 'var(--accent-warm)' : item.zone === 5 ? 'var(--accent-red)' : 'var(--accent-purple)' }}>{item.zone === 'STR' ? 'Strength' : item.zone === 'SIM' ? 'Sim' : `Z${item.zone}`}</span>}
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                    <div className="fade-in-up delay-2" style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                                <div>
-                                    <p className="text-xs text-secondary uppercase tracking-wider">Current Phase</p>
-                                    <p className="text-lg font-bold">{phase.name}</p>
-                                    <p className="text-sm text-secondary">{phase.focus}</p>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <p className="text-xs text-secondary">Week</p>
-                                    <p className="text-xl font-bold">{phase.weekInPhase}<span className="text-secondary">/{phase.totalWeeks}</span></p>
-                                </div>
                             </div>
-                            <div className="progress-bar"><div className="progress-fill" style={{ width: `${(phase.weekInPhase/phase.totalWeeks)*100}%`, background: 'var(--accent-blue)' }} /></div>
-                        </div>
-                    </div>
-                    <div className="fade-in-up delay-3" style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-                                <p className="text-xs text-secondary uppercase tracking-wider">Weekly Volume</p>
-                                <p className="font-bold">{weeklyVol.toFixed(1)} <span className="text-secondary font-normal">/ {targetVol}km</span></p>
-                            </div>
-                            <div className="progress-bar" style={{ height: 8 }}><div className="progress-fill" style={{ width: `${Math.min(100, weeklyVol/targetVol*100)}%`, background: weeklyVol >= targetVol ? 'var(--accent-green)' : 'var(--accent-blue)' }} /></div>
-                        </div>
-                    </div>
-                    <div className="fade-in-up delay-4" style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Today's Session</p>
-                        {todaySession && <SessionCard session={todaySession} day={todayName} isToday onClick={() => setSelectedSession(todaySession)} />}
-                    </div>
-                    <div className="fade-in-up delay-5" style={{ padding: '0 20px' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-                            <div className="glass-card-subtle" style={{ padding: 16, textAlign: 'center' }}><p className="text-2xl font-bold">{latestVo2.toFixed(1)}</p><p className="text-xs text-secondary">VO₂max</p></div>
-                            <div className="glass-card-subtle" style={{ padding: 16, textAlign: 'center' }}><p className="text-2xl font-bold">{latestHR}</p><p className="text-xs text-secondary">Resting HR</p></div>
-                            <div className="glass-card-subtle" style={{ padding: 16, textAlign: 'center' }}><p className="text-2xl font-bold">{workouts.filter(w => new Date(w['Date']) >= now - 7*24*60*60*1000).length}</p><p className="text-xs text-secondary">Sessions</p></div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             );
 
-            // RENDER: PLAN
-            const renderPlan = () => (
-                <div className="hide-scrollbar" style={{ paddingBottom: 100 }}>
-                    <div style={{ padding: '16px 20px' }}><h1 className="text-2xl font-bold">This Week</h1><p className="text-secondary">Week {currentWeek} · {phase.name}</p></div>
-                    <div style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <div className="glass-card-subtle" style={{ padding: 16, borderLeft: '3px solid var(--accent-blue)' }}>
-                            <p className="font-semibold" style={{ color: 'var(--accent-blue)' }}>{phase.focus}</p>
-                            <p className="text-sm text-secondary" style={{ marginTop: 4 }}>{phase.desc}</p>
-                        </div>
-                    </div>
-                    <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        {weekPlan.map((item, i) => <SessionCard key={i} session={item.session} day={item.day} isToday={item.day === todayName} onClick={() => setSelectedSession(item.session)} />)}
-                    </div>
-                    <div style={{ padding: '20px' }}>
-                        <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Target Distribution</p>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', height: 12, borderRadius: 6, overflow: 'hidden', marginBottom: 12 }}>
-                                <div style={{ width: `${phase.dist.z2}%`, background: 'var(--accent-green)' }} />
-                                <div style={{ width: `${phase.dist.threshold}%`, background: 'var(--accent-orange)' }} />
-                                <div style={{ width: `${phase.dist.vo2}%`, background: 'var(--accent-red)' }} />
-                                <div style={{ width: `${phase.dist.strength}%`, background: 'var(--accent-purple)' }} />
-                                <div style={{ width: `${phase.dist.sim}%`, background: 'var(--accent-pink)' }} />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, textAlign: 'center', fontSize: 12 }}>
-                                <div><span style={{ color: 'var(--accent-green)' }}>{phase.dist.z2}%</span><br/><span className="text-secondary">Z2</span></div>
-                                <div><span style={{ color: 'var(--accent-orange)' }}>{phase.dist.threshold}%</span><br/><span className="text-secondary">Thresh</span></div>
-                                <div><span style={{ color: 'var(--accent-red)' }}>{phase.dist.vo2}%</span><br/><span className="text-secondary">VO₂</span></div>
-                                <div><span style={{ color: 'var(--accent-purple)' }}>{phase.dist.strength}%</span><br/><span className="text-secondary">Str</span></div>
-                                <div><span style={{ color: 'var(--accent-pink)' }}>{phase.dist.sim}%</span><br/><span className="text-secondary">Sim</span></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div style={{ padding: '0 20px' }}>
-                        <div className="glass-card-subtle" style={{ padding: 16, background: 'rgba(10,132,255,0.08)', borderColor: 'rgba(10,132,255,0.2)' }}>
-                            <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--accent-blue)', marginBottom: 8 }}>📚 Why This Week?</p>
-                            <p className="text-sm">{phase.research}</p>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // RENDER: PROGRESS
-            const renderProgress = () => (
-                <div className="hide-scrollbar" style={{ paddingBottom: 100 }}>
-                    <div style={{ padding: '16px 20px' }}><h1 className="text-2xl font-bold">Progress</h1><p className="text-secondary">Track your improvements</p></div>
-                    <div style={{ padding: '0 20px', marginBottom: 20 }}>
-                        <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Log a Test</p>
-                        <div style={{ display: 'flex', gap: 8, overflowX: 'auto' }} className="hide-scrollbar">
-                            <button className="glass-card-subtle" style={{ padding: '12px 16px', whiteSpace: 'nowrap', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => setTestModal('twoKm')}>🔥 2km TT</button>
-                            <button className="glass-card-subtle" style={{ padding: '12px 16px', whiteSpace: 'nowrap', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => setTestModal('threshold')}>⚡ 20-min Test</button>
-                            <button className="glass-card-subtle" style={{ padding: '12px 16px', whiteSpace: 'nowrap', border: 'none', color: 'white', cursor: 'pointer' }} onClick={() => setTestModal('miniSim')}>🏋️ Mini-Sim</button>
-                        </div>
-                    </div>
-                    <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><div><p className="text-xs text-secondary">VO₂max</p><p className="text-2xl font-bold">{latestVo2.toFixed(1)}</p></div><div style={{ textAlign: 'right' }}><p className="text-xs text-secondary">Target</p><p className="font-bold" style={{ color: 'var(--accent-green)' }}>{TARGETS.vo2max}</p></div></div>
-                            <div className="progress-bar"><div className="progress-fill" style={{ width: `${scores.aerobic}%`, background: 'var(--accent-green)' }} /></div>
-                        </div>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><div><p className="text-xs text-secondary">2km Time Trial</p><p className="text-2xl font-bold">{tests.twoKm.length > 0 ? formatTime(tests.twoKm[tests.twoKm.length-1].time) : '—'}</p></div><div style={{ textAlign: 'right' }}><p className="text-xs text-secondary">Target</p><p className="font-bold" style={{ color: 'var(--accent-red)' }}>{formatTime(TARGETS.twoKmTime)}</p></div></div>
-                            <div className="progress-bar"><div className="progress-fill" style={{ width: `${scores.speed}%`, background: 'var(--accent-red)' }} /></div>
-                        </div>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><div><p className="text-xs text-secondary">Threshold Pace</p><p className="text-2xl font-bold">{tests.threshold.length > 0 ? formatPace(tests.threshold[tests.threshold.length-1].avgPace) : '—'}</p></div><div style={{ textAlign: 'right' }}><p className="text-xs text-secondary">Target</p><p className="font-bold" style={{ color: 'var(--accent-orange)' }}>{formatPace(TARGETS.thresholdPace)}</p></div></div>
-                            <div className="progress-bar"><div className="progress-fill" style={{ width: `${scores.threshold}%`, background: 'var(--accent-orange)' }} /></div>
-                        </div>
-                        <div className="glass-card-subtle" style={{ padding: 16 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}><div><p className="text-xs text-secondary">Mini-Sim Total</p><p className="text-2xl font-bold">{tests.miniSim.length > 0 ? formatTime(tests.miniSim[tests.miniSim.length-1].total) : '—'}</p></div><div style={{ textAlign: 'right' }}><p className="text-xs text-secondary">Target</p><p className="font-bold" style={{ color: 'var(--accent-purple)' }}>{formatTime(TARGETS.miniSimTotal)}</p></div></div>
-                            <div className="progress-bar"><div className="progress-fill" style={{ width: `${scores.functional}%`, background: 'var(--accent-purple)' }} /></div>
-                        </div>
-                    </div>
-                    <div style={{ padding: '20px' }}>
-                        <p className="text-xs text-secondary uppercase tracking-wider" style={{ marginBottom: 12 }}>Recent Tests</p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                            {[...tests.twoKm.map(t => ({...t, label: '2km TT', val: formatTime(t.time)})),...tests.threshold.map(t => ({...t, label: '20-min', val: formatPace(t.avgPace)})),...tests.miniSim.map(t => ({...t, label: 'Mini-Sim', val: formatTime(t.total)}))].sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5).map((t, i) => (
-                                <div key={i} className="glass-card-subtle" style={{ padding: 12, display: 'flex', justifyContent: 'space-between' }}><div><p className="font-medium">{t.label}</p><p className="text-xs text-secondary">{t.date}</p></div><p className="font-bold">{t.val}</p></div>
-                            ))}
-                            {tests.twoKm.length + tests.threshold.length + tests.miniSim.length === 0 && <p className="text-secondary text-center" style={{ padding: 20 }}>No tests logged yet</p>}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            const SettingsModal = () => showSettings ? (
-                <div className="modal-overlay" onClick={() => setShowSettings(false)}>
-                    <div className="modal-content" onClick={e => e.stopPropagation()}>
-                        <div className="modal-handle" />
-                        <div style={{ padding: 20 }}>
-                            <h2 className="text-xl font-bold" style={{ marginBottom: 20 }}>Settings</h2>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                                <div><label className="text-xs text-secondary uppercase">Name</label><input type="text" value={profile.name} onChange={e => setProfile(p => ({...p, name: e.target.value}))} style={{ marginTop: 8 }} /></div>
-                                <div><label className="text-xs text-secondary uppercase">Training Start Date</label><input type="date" value={profile.startDate} onChange={e => setProfile(p => ({...p, startDate: e.target.value}))} style={{ marginTop: 8 }} /></div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                                    <div><label className="text-xs text-secondary uppercase">B-Race Date</label><input type="date" value={profile.bRaceDate} onChange={e => setProfile(p => ({...p, bRaceDate: e.target.value}))} style={{ marginTop: 8 }} /></div>
-                                    <div><label className="text-xs text-secondary uppercase">A-Race Date</label><input type="date" value={profile.aRaceDate} onChange={e => setProfile(p => ({...p, aRaceDate: e.target.value}))} style={{ marginTop: 8 }} /></div>
-                                </div>
-                                <div><label className="text-xs text-secondary uppercase">Target Time</label><input type="text" value={profile.targetTime} onChange={e => setProfile(p => ({...p, targetTime: e.target.value}))} style={{ marginTop: 8 }} /></div>
-                            </div>
-                            <button className="btn-primary" style={{ marginTop: 24 }} onClick={() => setShowSettings(false)}>Done</button>
-                        </div>
-                    </div>
-                </div>
-            ) : null;
-
+            // ============================================
+            // RENDER
+            // ============================================
             return (
-                <div style={{ minHeight: '100vh', maxWidth: 500, margin: '0 auto' }}>
-                    <main style={{ height: 'calc(100vh - 70px)', overflowY: 'auto' }}>
-                        {tab === 'today' && renderToday()}
-                        {tab === 'plan' && renderPlan()}
-                        {tab === 'progress' && renderProgress()}
-                    </main>
-                    <nav className="nav-bar">
-                        <div style={{ display: 'flex', justifyContent: 'space-around' }}>
-                            {[
-                                { id: 'today', label: 'Today', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> },
-                                { id: 'plan', label: 'Plan', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> },
-                                { id: 'progress', label: 'Progress', icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> },
-                            ].map(item => (
-                                <button key={item.id} onClick={() => setTab(item.id)} className={`nav-item ${tab === item.id ? 'active' : ''}`}>{item.icon}<span>{item.label}</span></button>
-                            ))}
-                        </div>
+                <>
+                    {tab === 'home' && renderHome()}
+                    {tab === 'plan' && renderPlan()}
+
+                    <nav className="nav">
+                        <button className={`nav-item ${tab === 'home' ? 'active' : ''}`} onClick={() => setTab('home')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                            <span>Home</span>
+                        </button>
+                        <button className={`nav-item ${tab === 'plan' ? 'active' : ''}`} onClick={() => setTab('plan')}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            <span>Plan</span>
+                        </button>
                     </nav>
-                    {selectedSession && <SessionModal session={selectedSession} onClose={() => setSelectedSession(null)} />}
+
+                    {modal?.type === 'recovery' && <RecoveryDetail data={modal.data} onClose={() => setModal(null)} />}
+                    {modal?.type === 'aerobic' && <AerobicDetail data={modal.data} onClose={() => setModal(null)} />}
+                    {modal?.type === 'raceFitness' && <RaceFitnessDetail data={modal.data} onClose={() => setModal(null)} onLogTest={(t) => { setModal(null); setTestModal(t); }} />}
+                    {modal?.type === 'hyroxReady' && <HyroxReadyDetail data={modal.data} onClose={() => setModal(null)} onLogTest={(t) => { setModal(null); setTestModal(t); }} />}
+                    {modal?.type === 'session' && <SessionDetail session={modal.data} onClose={() => setModal(null)} />}
                     {testModal && <TestModal type={testModal} onClose={() => setTestModal(null)} onSave={handleTestSave} />}
-                    <SettingsModal />
-                </div>
+                </>
             );
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('app'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('app')).render(<App />);
     </script>
 </body>
 </html>
