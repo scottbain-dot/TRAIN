@@ -204,6 +204,17 @@ const parseTime = (str) => { if (!str) return 0; const p = str.split(':'); retur
 const mean = (arr) => arr.length ? arr.reduce((a,b) => a+b, 0) / arr.length : 0;
 const stdDev = (arr) => { const m = mean(arr); return Math.sqrt(arr.reduce((s,v) => s + Math.pow(v-m, 2), 0) / arr.length); };
 
+const parseSheetDate = (d) => {
+    if (!d) return null;
+    if (typeof d === 'string') return d;
+    // Google Sheets Date format: "Date(2026,0,15)" where month is 0-indexed
+    if (typeof d === 'string' && d.startsWith('Date(')) {
+        const match = d.match(/Date\((\d+),(\d+),(\d+)\)/);
+        if (match) return `${match[1]}-${String(parseInt(match[2])+1).padStart(2,'0')}-${match[3].padStart(2,'0')}`;
+    }
+    return d;
+};
+
 const fetchSheet = async (name) => {
     try {
         const res = await fetch(`https://docs.google.com/spreadsheets/d/${SHEETS.id}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`);
@@ -211,8 +222,21 @@ const fetchSheet = async (name) => {
         const json = JSON.parse(txt.substring(47).slice(0,-2));
         const headers = json.table.cols.map(c => c.label || '');
         console.log(`[${name}] Headers:`, headers);
-        const data = json.table.rows?.map(r => { const o = {}; r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; }); return o; }).filter(o => o['Date']) || [];
-        console.log(`[${name}] Rows:`, data.length, data.slice(0,3));
+        const data = json.table.rows?.map(r => { 
+            const o = {}; 
+            r.c?.forEach((c,i) => { 
+                if(headers[i]) {
+                    // Use formatted value (f) for dates, otherwise use value (v)
+                    if (headers[i] === 'Date') {
+                        o[headers[i]] = c?.f || c?.v || null;
+                    } else {
+                        o[headers[i]] = c?.v ?? c?.f ?? null;
+                    }
+                }
+            }); 
+            return o; 
+        }).filter(o => o['Date']) || [];
+        console.log(`[${name}] Rows:`, data.length, 'Sample:', data.slice(0,2));
         return data;
     } catch (e) { console.error(`[${name}] Error:`, e); return []; }
 };
