@@ -19,7 +19,6 @@
             --text: #ffffff;
             --text-secondary: rgba(255,255,255,0.55);
             --text-tertiary: rgba(255,255,255,0.3);
-            
             --green: #34C759;
             --green-dim: rgba(52,199,89,0.15);
             --yellow: #FFD60A;
@@ -36,333 +35,114 @@
             --cyan-dim: rgba(90,200,250,0.15);
         }
         
-        body {
-            font-family: 'Inter', -apple-system, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            line-height: 1.4;
-            -webkit-font-smoothing: antialiased;
-        }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); color: var(--text); line-height: 1.4; -webkit-font-smoothing: antialiased; }
         
-        /* ===== GRADIENTS ===== */
-        .grad-readiness {
-            background: linear-gradient(145deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
-        }
-        .grad-aerobic {
-            background: linear-gradient(145deg, #0f3024 0%, #1a4a3a 50%, #2d6a4f 100%);
-        }
-        .grad-race {
-            background: linear-gradient(145deg, #2d1f0f 0%, #4a3520 50%, #6b4423 100%);
-        }
-        .grad-hyrox {
-            background: linear-gradient(145deg, #1f0f2d 0%, #3a1a4a 50%, #5c2d6b 100%);
-        }
-        .grad-session {
-            background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-        }
+        /* Gradients */
+        .grad-readiness { background: linear-gradient(135deg, #1a3a4a 0%, #0d2030 50%, #0a1520 100%); }
+        .grad-aerobic { background: linear-gradient(135deg, #1a4a3a 0%, #0d3020 50%, #0a2015 100%); }
+        .grad-race { background: linear-gradient(135deg, #4a3a1a 0%, #302510 50%, #201a0a 100%); }
+        .grad-hyrox { background: linear-gradient(135deg, #3a1a4a 0%, #200d30 50%, #150a20 100%); }
+        .grad-session { background: linear-gradient(165deg, #2c3e50 0%, #1a252f 40%, #0d1318 100%); }
         
-        /* Aurora overlay */
+        .aurora { position: relative; overflow: hidden; }
         .aurora::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: 
-                radial-gradient(ellipse 80% 50% at 20% 40%, rgba(90,200,250,0.08) 0%, transparent 50%),
-                radial-gradient(ellipse 60% 40% at 80% 60%, rgba(52,199,89,0.06) 0%, transparent 50%);
-            pointer-events: none;
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(ellipse at 30% 20%, rgba(0,212,170,0.15) 0%, transparent 50%),
+                        radial-gradient(ellipse at 70% 60%, rgba(74,144,217,0.1) 0%, transparent 40%);
+            animation: aurora 15s ease-in-out infinite; pointer-events: none;
         }
+        @keyframes aurora { 0%, 100% { transform: translate(0,0) rotate(0deg); } 50% { transform: translate(-5%,5%) rotate(3deg); } }
         
-        /* ===== CARDS ===== */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 20px;
-            overflow: hidden;
-        }
+        /* Cards */
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+        .card:active { transform: scale(0.98); }
+        .metric-card { position: relative; padding: 20px; min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; }
+        .metric-card .arrow { position: absolute; top: 18px; right: 18px; width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgba(255,255,255,0.6); }
         
-        .metric-card {
-            position: relative;
-            padding: 20px;
-            min-height: 150px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: transform 0.2s, opacity 0.2s;
-        }
-        .metric-card:active { transform: scale(0.97); opacity: 0.9; }
-        .metric-card .arrow {
-            position: absolute;
-            top: 18px;
-            right: 18px;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            color: rgba(255,255,255,0.6);
-        }
+        /* Typography */
+        .label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-secondary); }
+        .value-xl { font-size: 44px; font-weight: 300; letter-spacing: -2px; line-height: 1.1; }
+        .value-lg { font-size: 32px; font-weight: 400; letter-spacing: -1px; }
+        .unit { font-size: 14px; font-weight: 400; color: var(--text-secondary); margin-left: 4px; }
+        .insight { font-size: 14px; color: var(--text-secondary); line-height: 1.4; }
         
-        /* ===== TYPOGRAPHY ===== */
-        .label {
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            color: var(--text-secondary);
-        }
-        .value-xl {
-            font-size: 44px;
-            font-weight: 300;
-            letter-spacing: -2px;
-            line-height: 1.1;
-        }
-        .value-lg {
-            font-size: 32px;
-            font-weight: 400;
-            letter-spacing: -1px;
-        }
-        .value-md {
-            font-size: 24px;
-            font-weight: 500;
-        }
-        .unit {
-            font-size: 14px;
-            font-weight: 400;
-            color: var(--text-secondary);
-            margin-left: 4px;
-        }
-        .insight {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-        
-        /* ===== TRENDS ===== */
-        .trend {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 13px;
-            font-weight: 500;
-            padding: 4px 10px;
-            border-radius: 12px;
-        }
+        /* Trends */
+        .trend { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 500; padding: 4px 10px; border-radius: 12px; }
         .trend-up { background: var(--green-dim); color: var(--green); }
         .trend-down { background: var(--red-dim); color: var(--red); }
         .trend-stable { background: var(--yellow-dim); color: var(--yellow); }
         .trend-neutral { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
         
-        /* ===== PROGRESS BAR ===== */
-        .progress-bar {
-            height: 6px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-        .progress-fill {
-            height: 100%;
-            border-radius: 3px;
-            transition: width 0.6s ease-out;
-        }
+        /* Progress */
+        .progress-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
         
-        /* ===== CHART ===== */
-        .mini-chart {
-            display: flex;
-            align-items: flex-end;
-            gap: 3px;
-            height: 40px;
-        }
-        .mini-chart-bar {
-            flex: 1;
-            background: var(--blue);
-            border-radius: 2px;
-            min-height: 4px;
-            opacity: 0.7;
-            transition: opacity 0.2s;
-        }
-        .mini-chart-bar:last-child { opacity: 1; }
+        /* Charts */
+        .chart-container { position: relative; height: 200px; margin: 16px 0; }
+        .chart-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .chart-area { opacity: 0.15; }
+        .chart-dot { fill: var(--bg); stroke-width: 2; }
+        .chart-grid { stroke: rgba(255,255,255,0.06); stroke-width: 1; }
+        .chart-label { font-size: 10px; fill: var(--text-tertiary); }
+        .chart-value { font-size: 11px; fill: var(--text-secondary); }
         
-        /* ===== TIME RANGE TOGGLE ===== */
-        .time-toggle {
-            display: flex;
-            background: var(--bg-elevated);
-            border-radius: 10px;
-            padding: 3px;
-        }
-        .time-toggle button {
-            flex: 1;
-            padding: 8px 12px;
-            border: none;
-            border-radius: 8px;
-            background: transparent;
-            color: var(--text-tertiary);
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .time-toggle button.active {
-            background: var(--bg-card);
-            color: var(--text);
-        }
+        /* Bar chart */
+        .bar-chart { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding: 0 4px; }
+        .bar { flex: 1; border-radius: 4px 4px 0 0; min-width: 8px; transition: height 0.3s ease; position: relative; }
+        .bar-label { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text-tertiary); white-space: nowrap; }
         
-        /* ===== DATA ROW ===== */
-        .data-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 16px 0;
-            border-bottom: 1px solid var(--border);
-        }
+        /* Time toggle */
+        .time-toggle { display: flex; background: var(--bg-elevated); border-radius: 10px; padding: 3px; }
+        .time-toggle button { flex: 1; padding: 8px 12px; border: none; border-radius: 8px; background: transparent; color: var(--text-tertiary); font-size: 13px; font-weight: 500; cursor: pointer; }
+        .time-toggle button.active { background: var(--bg-card); color: var(--text); }
+        
+        /* Data rows */
+        .data-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
         .data-row:last-child { border-bottom: none; }
-        .data-row-label { color: var(--text-secondary); font-size: 14px; }
-        .data-row-value { font-weight: 600; font-size: 16px; }
-        .data-row-sub { font-size: 12px; color: var(--text-tertiary); margin-top: 2px; }
         
-        /* ===== LIMITER BADGE ===== */
-        .limiter-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 14px;
-            background: var(--orange-dim);
-            border: 1px solid rgba(255,159,10,0.3);
-            border-radius: 12px;
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--orange);
-        }
+        /* Comparison card */
+        .compare-card { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; padding: 20px; align-items: center; }
+        .compare-period { text-align: center; }
+        .compare-vs { font-size: 12px; color: var(--text-tertiary); padding: 8px 12px; background: var(--bg-elevated); border-radius: 8px; }
         
-        /* ===== INSIGHT BOX ===== */
-        .insight-box {
-            padding: 16px;
-            border-radius: 14px;
-            margin-top: 16px;
-        }
+        /* Insight box */
+        .insight-box { padding: 16px; border-radius: 14px; margin-top: 16px; }
         .insight-box.green { background: var(--green-dim); border: 1px solid rgba(52,199,89,0.2); }
         .insight-box.blue { background: var(--blue-dim); border: 1px solid rgba(10,132,255,0.2); }
         .insight-box.orange { background: var(--orange-dim); border: 1px solid rgba(255,159,10,0.2); }
         .insight-box.purple { background: var(--purple-dim); border: 1px solid rgba(191,90,242,0.2); }
-        .insight-box-title {
-            font-weight: 600;
-            font-size: 14px;
-            margin-bottom: 6px;
-        }
+        .insight-box-title { font-weight: 600; font-size: 14px; margin-bottom: 6px; }
         .insight-box.green .insight-box-title { color: var(--green); }
         .insight-box.blue .insight-box-title { color: var(--blue); }
         .insight-box.orange .insight-box-title { color: var(--orange); }
-        .insight-box.purple .insight-box-title { color: var(--purple); }
         
-        /* ===== MODAL ===== */
-        .modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.9);
-            z-index: 100;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.25s;
-        }
+        /* Stat grid */
+        .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        .stat-card { background: var(--bg-elevated); border-radius: 14px; padding: 16px; }
+        .stat-value { font-size: 28px; font-weight: 600; margin: 4px 0; }
+        .stat-change { font-size: 13px; margin-top: 4px; }
+        .stat-change.positive { color: var(--green); }
+        .stat-change.negative { color: var(--red); }
+        .stat-change.neutral { color: var(--text-tertiary); }
+        
+        /* Modals */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; opacity: 0; visibility: hidden; transition: all 0.25s; }
         .modal-overlay.open { opacity: 1; visibility: visible; }
-        
-        .modal-content {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            max-height: 92vh;
-            background: #0a0a0a;
-            border-radius: 24px 24px 0 0;
-            overflow-y: auto;
-            transform: translateY(100%);
-            transition: transform 0.3s ease-out;
-        }
+        .modal-content { position: absolute; bottom: 0; left: 0; right: 0; max-height: 92vh; background: #0a0a0a; border-radius: 24px 24px 0 0; overflow-y: auto; transform: translateY(100%); transition: transform 0.3s ease-out; }
         .modal-overlay.open .modal-content { transform: translateY(0); }
-        
-        .modal-handle {
-            width: 36px;
-            height: 4px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 2px;
-            margin: 10px auto 0;
-        }
-        
-        .modal-header {
-            position: relative;
-            padding: 40px 24px 24px;
-            min-height: 200px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-        }
-        
-        .modal-back {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: rgba(0,0,0,0.4);
-            border: none;
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
+        .modal-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 10px auto 0; }
+        .modal-header { position: relative; padding: 40px 24px 24px; min-height: 200px; display: flex; flex-direction: column; justify-content: flex-end; }
+        .modal-back { position: absolute; top: 16px; left: 16px; width: 36px; height: 36px; border-radius: 50%; background: rgba(0,0,0,0.4); border: none; color: white; font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .modal-body { padding: 24px; }
         
-        /* ===== NAV ===== */
-        .nav {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: rgba(10,10,10,0.95);
-            backdrop-filter: blur(20px);
-            border-top: 1px solid var(--border);
-            padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
-            display: flex;
-            justify-content: space-around;
-            z-index: 50;
-        }
-        .nav-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            padding: 8px 20px;
-            background: none;
-            border: none;
-            color: var(--text-tertiary);
-            font-size: 10px;
-            font-weight: 500;
-            cursor: pointer;
-        }
+        /* Nav */
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,10,10,0.95); backdrop-filter: blur(20px); border-top: 1px solid var(--border); padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); display: flex; justify-content: space-around; z-index: 50; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 16px; background: none; border: none; color: var(--text-tertiary); font-size: 10px; font-weight: 500; cursor: pointer; }
         .nav-item.active { color: var(--blue); }
         .nav-item svg { width: 24px; height: 24px; }
         
-        /* ===== SESSION CARD ===== */
-        .session-card {
-            position: relative;
-            padding: 20px;
-            cursor: pointer;
-        }
-        .session-badge {
-            display: inline-flex;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 10px;
-        }
+        /* Session */
+        .session-badge { display: inline-flex; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
         .session-badge.z2 { background: var(--green-dim); color: var(--green); }
         .session-badge.z4 { background: var(--orange-dim); color: var(--orange); }
         .session-badge.z5 { background: var(--red-dim); color: var(--red); }
@@ -370,7 +150,10 @@
         .session-badge.sim { background: var(--cyan-dim); color: var(--cyan); }
         .session-badge.rest { background: rgba(255,255,255,0.08); color: var(--text-secondary); }
         
-        /* ===== UTILITIES ===== */
+        /* Limiter badge */
+        .limiter-badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; background: var(--orange-dim); border: 1px solid rgba(255,159,10,0.3); border-radius: 12px; font-size: 13px; font-weight: 500; color: var(--orange); }
+        
+        /* Utility */
         .container { max-width: 500px; margin: 0 auto; padding-bottom: 100px; }
         .px-5 { padding-left: 20px; padding-right: 20px; }
         .py-4 { padding-top: 16px; padding-bottom: 16px; }
@@ -382,17 +165,11 @@
         .flex { display: flex; }
         .flex-between { justify-content: space-between; }
         .flex-center { align-items: center; }
-        .gap-2 { gap: 8px; }
         .gap-3 { gap: 12px; }
-        .text-center { text-align: center; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
-        /* ===== ANIMATIONS ===== */
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(16px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
         .fade-up { animation: fadeUp 0.4s ease-out forwards; }
         .delay-1 { animation-delay: 0.05s; opacity: 0; }
         .delay-2 { animation-delay: 0.1s; opacity: 0; }
@@ -410,34 +187,16 @@
 const { useState, useEffect, useCallback, useMemo } = React;
 
 // ============================================
-// CONFIGURATION
+// CONFIG
 // ============================================
 const SHEETS = { id: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc', workouts: 'Workouts', daily: 'DailyMetrics' };
-
-const TARGETS = {
-    vo2max: 48,
-    twoKm: 465,        // 7:45
-    threshold: 255,    // 4:15/km
-    weeklyVol: 50,
-    raceTime: 65 * 60, // 1:05:00 in seconds
-    paceDecay: 5,      // %
-};
-
-const BASELINES = {
-    vo2max: 43.5,
-    twoKm: 540,        // 9:00
-    threshold: 285,    // 4:45/km
-    weeklyVol: 25,
-};
+const TARGETS = { vo2max: 48, twoKm: 465, threshold: 255, weeklyVol: 50, raceTime: 65 * 60, paceDecay: 5 };
+const BASELINES = { vo2max: 43.5, twoKm: 540, threshold: 285, weeklyVol: 25 };
 
 // ============================================
 // UTILITIES
 // ============================================
-const storage = {
-    get: (k, d) => { try { return JSON.parse(localStorage.getItem('hyrox10_'+k)) || d; } catch { return d; }},
-    set: (k, v) => localStorage.setItem('hyrox10_'+k, JSON.stringify(v))
-};
-
+const storage = { get: (k, d) => { try { return JSON.parse(localStorage.getItem('hyrox11_'+k)) || d; } catch { return d; }}, set: (k, v) => localStorage.setItem('hyrox11_'+k, JSON.stringify(v)) };
 const formatTime = (s) => s > 0 ? `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}` : '—';
 const formatPace = (s) => s > 0 ? `${Math.floor(s/60)}:${String(Math.round(s%60)).padStart(2,'0')}/km` : '—';
 const formatDuration = (m) => m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}min`;
@@ -451,310 +210,237 @@ const fetchSheet = async (name) => {
         const txt = await res.text();
         const json = JSON.parse(txt.substring(47).slice(0,-2));
         const headers = json.table.cols.map(c => c.label || '');
-        return json.table.rows?.map(r => {
-            const o = {};
-            r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; });
-            return o;
-        }).filter(o => o['Date']) || [];
+        return json.table.rows?.map(r => { const o = {}; r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; }); return o; }).filter(o => o['Date']) || [];
     } catch { return []; }
 };
 
 // ============================================
-// INSIGHT ENGINE
+// ANALYSIS ENGINE
 // ============================================
-const InsightEngine = {
-    // Calculate Readiness Score
-    calculateReadiness: (data) => {
-        const { restingHR, hrv, sleep, hrHistory, hrvHistory, yesterdayLoad, avgDailyLoad } = data;
-        
-        // HR Component (0-30)
-        const hrAvg = mean(hrHistory.slice(-7).map(d => d.hr).filter(Boolean)) || 55;
-        const hrDiff = hrAvg > 0 ? ((restingHR - hrAvg) / hrAvg) * 100 : 0;
-        let hrScore = hrDiff <= -2 ? 30 : hrDiff <= 2 ? 25 : hrDiff <= 5 ? 15 : 5;
-        
-        // HRV Component (0-30)
-        const hrvArr = hrvHistory.slice(-7).map(d => d.hrv).filter(Boolean);
-        const hrvAvg = mean(hrvArr) || hrv;
-        const hrvCV = hrvArr.length > 2 ? (stdDev(hrvArr) / hrvAvg) * 100 : 0;
-        const hrvDiff = hrvAvg > 0 ? ((hrv - hrvAvg) / hrvAvg) * 100 : 0;
-        let hrvScore = (hrvDiff >= 5 && hrvCV < 15) ? 30 : hrvDiff >= 0 ? 25 : hrvDiff >= -10 ? 15 : 5;
-        
-        // Sleep Component (0-20)
-        let sleepScore = sleep >= 7.5 ? 20 : sleep >= 7 ? 16 : sleep >= 6 ? 10 : sleep > 0 ? 5 : 12;
-        
-        // Load Component (0-20)
-        const loadRatio = avgDailyLoad > 0 ? yesterdayLoad / avgDailyLoad : 1;
-        let loadScore = loadRatio <= 1.2 ? 20 : loadRatio <= 1.5 ? 15 : loadRatio <= 2 ? 10 : 5;
-        
-        const total = hrScore + hrvScore + sleepScore + loadScore;
-        
-        return {
-            score: total,
-            components: { hr: { score: hrScore, value: restingHR, avg: hrAvg, diff: hrDiff }, hrv: { score: hrvScore, value: hrv, avg: hrvAvg, cv: hrvCV }, sleep: { score: sleepScore, value: sleep }, load: { score: loadScore, ratio: loadRatio } },
-            status: total >= 85 ? 'peak' : total >= 70 ? 'good' : total >= 55 ? 'moderate' : total >= 40 ? 'low' : 'rest',
-            message: total >= 85 ? "You're primed. Great day for intensity." : total >= 70 ? "Solid recovery. Train as planned." : total >= 55 ? "Some fatigue. Listen to your body." : total >= 40 ? "Recovery incomplete. Go easy." : "Rest day recommended.",
-            color: total >= 70 ? 'green' : total >= 55 ? 'yellow' : 'orange'
-        };
+const AnalysisEngine = {
+    // Group data by week
+    groupByWeek: (data, dateKey = 'Date') => {
+        const weeks = {};
+        data.forEach(d => {
+            const date = new Date(d[dateKey]);
+            const weekStart = new Date(date);
+            weekStart.setDate(date.getDate() - date.getDay());
+            const key = weekStart.toISOString().split('T')[0];
+            if (!weeks[key]) weeks[key] = [];
+            weeks[key].push(d);
+        });
+        return Object.entries(weeks).sort((a, b) => new Date(a[0]) - new Date(b[0])).map(([week, items]) => ({ week, items }));
     },
-
-    // Calculate Aerobic Score
-    calculateAerobic: (data) => {
-        const { vo2max, weeklyVol, vo2History, volHistory, z2Runs } = data;
+    
+    // Group data by month
+    groupByMonth: (data, dateKey = 'Date') => {
+        const months = {};
+        data.forEach(d => {
+            const date = new Date(d[dateKey]);
+            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+            if (!months[key]) months[key] = [];
+            months[key].push(d);
+        });
+        return Object.entries(months).sort((a, b) => a[0].localeCompare(b[0])).map(([month, items]) => ({ month, items }));
+    },
+    
+    // Calculate weekly volume from workouts
+    weeklyVolumes: (workouts) => {
+        const weeks = AnalysisEngine.groupByWeek(workouts);
+        return weeks.map(({ week, items }) => ({
+            week,
+            volume: items.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0),
+            sessions: items.length,
+            duration: items.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0),
+        }));
+    },
+    
+    // Calculate monthly stats
+    monthlyStats: (workouts, dailyMetrics) => {
+        const workoutMonths = AnalysisEngine.groupByMonth(workouts);
+        const metricMonths = AnalysisEngine.groupByMonth(dailyMetrics);
         
-        // VO2max progress (0-40)
-        const vo2Progress = Math.max(0, Math.min(40, ((vo2max - BASELINES.vo2max) / (TARGETS.vo2max - BASELINES.vo2max)) * 40));
+        return workoutMonths.map(({ month, items }) => {
+            const metrics = metricMonths.find(m => m.month === month)?.items || [];
+            const vo2Values = metrics.map(m => parseFloat(m['VO2 Max'])).filter(Boolean);
+            const hrValues = metrics.map(m => parseFloat(m['Resting HR'])).filter(Boolean);
+            
+            return {
+                month,
+                volume: items.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0),
+                sessions: items.length,
+                duration: items.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0),
+                avgVo2: vo2Values.length ? mean(vo2Values) : null,
+                endVo2: vo2Values.length ? vo2Values[vo2Values.length - 1] : null,
+                avgHR: hrValues.length ? mean(hrValues) : null,
+            };
+        });
+    },
+    
+    // Compare two periods
+    comparePeriods: (data1, data2, metrics) => {
+        const results = {};
+        metrics.forEach(m => {
+            const v1 = mean(data1.map(d => parseFloat(d[m])).filter(Boolean));
+            const v2 = mean(data2.map(d => parseFloat(d[m])).filter(Boolean));
+            const change = v1 > 0 ? ((v2 - v1) / v1) * 100 : 0;
+            results[m] = { before: v1, after: v2, change, improved: m === 'Resting HR' ? change < 0 : change > 0 };
+        });
+        return results;
+    },
+    
+    // Find correlations
+    findCorrelations: (workouts, dailyMetrics) => {
+        const monthly = AnalysisEngine.monthlyStats(workouts, dailyMetrics);
+        const insights = [];
         
-        // Volume progress (0-35)
-        const volProgress = Math.max(0, Math.min(35, (weeklyVol / TARGETS.weeklyVol) * 35));
-        
-        // Efficiency trend (0-15)
-        const efficiencyRuns = z2Runs.slice(-10);
-        let efficiencyScore = 10;
-        if (efficiencyRuns.length >= 4) {
-            const recent = efficiencyRuns.slice(-2);
-            const older = efficiencyRuns.slice(0, 2);
-            const recentEff = mean(recent.map(r => r.pace / r.hr));
-            const olderEff = mean(older.map(r => r.pace / r.hr));
-            efficiencyScore = recentEff < olderEff ? 15 : recentEff === olderEff ? 10 : 5;
+        // Volume vs VO2max correlation
+        const volumeVo2Pairs = monthly.filter(m => m.volume > 0 && m.endVo2).map(m => ({ vol: m.volume, vo2: m.endVo2 }));
+        if (volumeVo2Pairs.length >= 3) {
+            const highVolMonths = volumeVo2Pairs.filter(p => p.vol >= 150);
+            const lowVolMonths = volumeVo2Pairs.filter(p => p.vol < 150);
+            if (highVolMonths.length > 0 && lowVolMonths.length > 0) {
+                const highVolVo2 = mean(highVolMonths.map(p => p.vo2));
+                const lowVolVo2 = mean(lowVolMonths.map(p => p.vo2));
+                if (highVolVo2 > lowVolVo2) {
+                    insights.push({ type: 'correlation', title: 'Volume drives VO₂max', detail: `Months with 150+ km averaged ${highVolVo2.toFixed(1)} VO₂max vs ${lowVolVo2.toFixed(1)} in lower volume months.`, impact: 'high', color: 'green' });
+                }
+            }
         }
         
-        // Consistency (0-10)
-        const weeksWithLongRun = volHistory.slice(-4).filter(w => w.longRun).length;
-        const consistencyScore = (weeksWithLongRun / 4) * 10;
+        // Consistency analysis
+        const weeklyVols = AnalysisEngine.weeklyVolumes(workouts);
+        const consistentWeeks = weeklyVols.filter(w => w.volume >= 30).length;
+        const totalWeeks = weeklyVols.length;
+        const consistency = totalWeeks > 0 ? (consistentWeeks / totalWeeks) * 100 : 0;
         
-        const total = vo2Progress + volProgress + efficiencyScore + consistencyScore;
-        
-        // Trend analysis
-        const vo2Trend = vo2History.length >= 4 ? (vo2History[vo2History.length-1]?.vo2 || vo2max) - (vo2History[vo2History.length-4]?.vo2 || vo2max) : 0;
-        const volTrend = volHistory.length >= 4 ? (volHistory[volHistory.length-1]?.vol || weeklyVol) - (volHistory[volHistory.length-4]?.vol || weeklyVol) : 0;
-        
-        // Projection
-        const weeklyVo2Gain = vo2Trend / 4;
-        const weeksToTarget = weeklyVo2Gain > 0 ? (TARGETS.vo2max - vo2max) / weeklyVo2Gain : null;
-        
-        return {
-            score: total,
-            vo2max,
-            weeklyVol,
-            trend: vo2Trend > 0.3 ? 'improving' : vo2Trend < -0.3 ? 'declining' : 'stable',
-            vo2Trend,
-            volTrend,
-            weeksToTarget,
-            insight: vo2Trend > 0 && volTrend >= 0 
-                ? { headline: "Engine growing", detail: `VO₂max up ${vo2Trend.toFixed(1)} in 4 weeks`, color: 'green' }
-                : vo2Trend <= 0 && volTrend > 0
-                ? { headline: "Volume up, VO₂ flat", detail: "May need more intensity", color: 'orange' }
-                : { headline: "Keep building", detail: "Consistency will pay off", color: 'blue' }
-        };
-    },
-
-    // Calculate Race Prediction
-    calculateRacePrediction: (data) => {
-        const { twoKm, threshold, weeklyVol, paceDecay, vo2max } = data;
-        
-        // Use threshold as base (or estimate from 2km)
-        const effectiveThreshold = threshold || (twoKm ? twoKm / 2 * 1.15 : BASELINES.threshold);
-        
-        // Run time estimate (8km at ~108% of threshold due to fatigue)
-        const racePace = effectiveThreshold * 1.08;
-        const runTime = 8 * racePace;
-        
-        // Station time estimate
-        const stationBase = 30 * 60; // 30 min base
-        const vo2Adjust = (TARGETS.vo2max - (vo2max || BASELINES.vo2max)) * 15; // 15 sec per VO2 point below target
-        const stationTime = stationBase + vo2Adjust;
-        
-        // Adjustments
-        const volumeBonus = Math.max(0, ((weeklyVol || 25) - 25) * 2);
-        const speedBonus = twoKm ? Math.max(0, (BASELINES.twoKm - twoKm) * 0.7) : 0;
-        const fatiguePenalty = paceDecay ? Math.max(0, (paceDecay - 5) * 25) : 0;
-        
-        const predicted = runTime + stationTime - volumeBonus - speedBonus + fatiguePenalty;
-        
-        // Confidence
-        const hasTests = [twoKm, threshold, paceDecay].filter(Boolean).length;
-        const confidence = hasTests >= 3 ? 'high' : hasTests >= 2 ? 'medium' : 'low';
-        
-        const gap = predicted - TARGETS.raceTime;
-        
-        return {
-            predicted: Math.round(predicted),
-            formatted: formatTime(Math.round(predicted)),
-            confidence,
-            gap,
-            breakdown: { runTime: Math.round(runTime), stationTime: Math.round(stationTime), volumeBonus: Math.round(volumeBonus), speedBonus: Math.round(speedBonus), fatiguePenalty: Math.round(fatiguePenalty) },
-            insight: gap <= 0 
-                ? { headline: "On track for 1:05!", detail: "Maintain consistency", color: 'green' }
-                : gap <= 300 
-                ? { headline: `${Math.round(gap/60)} min to find`, detail: "You're close", color: 'blue' }
-                : gap <= 600
-                ? { headline: "Building toward goal", detail: "Focus on fundamentals", color: 'orange' }
-                : { headline: "Long-term project", detail: "Patience and consistency", color: 'orange' }
-        };
-    },
-
-    // Calculate HYROX Readiness
-    calculateHyroxReady: (data) => {
-        const { latestSim, simHistory } = data;
-        
-        if (!latestSim) {
-            return { score: 0, hasSim: false, insight: { headline: "No data yet", detail: "Log a mini-sim to track", color: 'blue' } };
+        if (consistency < 60) {
+            insights.push({ type: 'consistency', title: 'Consistency is your opportunity', detail: `Only ${consistency.toFixed(0)}% of weeks had 30+ km. More consistent training would accelerate gains.`, impact: 'high', color: 'orange' });
+        } else if (consistency >= 80) {
+            insights.push({ type: 'consistency', title: 'Great consistency', detail: `${consistency.toFixed(0)}% of weeks hit 30+ km. This consistency is driving your progress.`, impact: 'positive', color: 'green' });
         }
         
-        const paceDecay = parseFloat(latestSim.decay) || 0;
-        const total = latestSim.total;
-        
-        // Pace decay score (0-40)
-        const decayScore = paceDecay <= 3 ? 40 : paceDecay <= 5 ? 35 : paceDecay <= 8 ? 25 : paceDecay <= 12 ? 15 : 5;
-        
-        // Total time score (0-40) - target 25:40 (1540s)
-        const timeScore = Math.max(0, Math.min(40, ((1800 - total) / (1800 - 1540)) * 40));
-        
-        // Consistency score (0-20)
-        const splits = latestSim.rounds?.map(r => r.run) || [];
-        const splitCV = splits.length >= 4 ? (stdDev(splits) / mean(splits)) * 100 : 10;
-        const consistencyScore = splitCV <= 3 ? 20 : splitCV <= 5 ? 15 : splitCV <= 8 ? 10 : 5;
-        
-        const score = decayScore + timeScore + consistencyScore;
-        
-        // Trend from history
-        const trend = simHistory.length >= 2 
-            ? simHistory[simHistory.length-1].total < simHistory[simHistory.length-2].total ? 'improving' : 'stable'
-            : 'stable';
-        
-        return {
-            score,
-            hasSim: true,
-            total,
-            paceDecay,
-            splitCV,
-            trend,
-            insight: paceDecay > 8 
-                ? { headline: "Fatigue resistance is your limiter", detail: `${paceDecay}% decay — target <5%`, color: 'orange' }
-                : paceDecay > 5
-                ? { headline: "Room to improve", detail: "More running after strength", color: 'blue' }
-                : { headline: "Strong fatigue resistance", detail: "Pacing is solid", color: 'green' }
-        };
+        return insights;
     },
-
-    // Detect Limiters
-    detectLimiters: (scores) => {
-        const { aerobic, threshold, speed, fatigue } = scores;
-        const values = { aerobic, threshold, speed, fatigue };
-        const avg = mean(Object.values(values).filter(Boolean));
+    
+    // Calculate progress rate
+    progressRate: (history, key, weeks = 12) => {
+        if (history.length < 2) return null;
+        const recent = history.slice(-weeks);
+        const first = parseFloat(recent[0]?.[key]);
+        const last = parseFloat(recent[recent.length - 1]?.[key]);
+        if (!first || !last) return null;
         
-        return Object.entries(values)
-            .filter(([k, v]) => v !== null && v < avg - 10)
-            .sort((a, b) => a[1] - b[1])
-            .map(([area, score]) => ({
-                area,
-                score,
-                gap: Math.round(avg - score),
-                label: { aerobic: 'Aerobic Base', threshold: 'Threshold Power', speed: 'Top-End Speed', fatigue: 'Fatigue Resistance' }[area],
-                action: { 
-                    aerobic: 'Add more Z2 volume', 
-                    threshold: 'Include tempo/threshold runs', 
-                    speed: 'Add VO₂max intervals', 
-                    fatigue: 'More mini-sims and running after strength' 
-                }[area]
-            }));
-    },
-
-    // Calculate Progress
-    calculateProgress: (current, history, target, higherIsBetter = true) => {
-        const fourWeeksAgo = history[history.length - 4] || history[0] || current;
-        const eightWeeksAgo = history[history.length - 8] || history[0] || current;
+        const change = last - first;
+        const weeklyRate = change / recent.length;
+        const weeksToTarget = weeklyRate > 0 ? (TARGETS[key === 'VO2 Max' ? 'vo2max' : key] - last) / weeklyRate : null;
         
-        const change4 = current - fourWeeksAgo;
-        const change8 = current - eightWeeksAgo;
-        const weeklyRate = change4 / 4;
-        
-        const improving = higherIsBetter ? weeklyRate > 0 : weeklyRate < 0;
-        const gap = higherIsBetter ? target - current : current - target;
-        const weeksToTarget = improving && weeklyRate !== 0 ? Math.abs(gap / weeklyRate) : null;
-        
-        return {
-            current,
-            fourWeeksAgo,
-            eightWeeksAgo,
-            change4,
-            change8,
-            weeklyRate,
-            trend: Math.abs(weeklyRate) < 0.1 ? 'stable' : improving ? 'improving' : 'declining',
-            weeksToTarget,
-            onTrack: weeksToTarget && weeksToTarget < 52
-        };
+        return { first, last, change, weeklyRate, weeksToTarget, trend: change > 0.5 ? 'improving' : change < -0.5 ? 'declining' : 'stable' };
     }
 };
 
 // ============================================
-// SESSIONS
+// CHART COMPONENTS
 // ============================================
-const SESSIONS = {
-    easyRun: (mins, km) => ({ type: 'Easy Run', zone: 2, duration: mins, distance: km, purpose: 'Build aerobic base', structure: [{ block: 'Warm-up', time: '5 min', note: 'Walk to jog' }, { block: 'Main', time: `${mins-10} min`, note: 'Easy pace, HR 130-145' }, { block: 'Cool-down', time: '5 min', note: 'Jog to walk' }], targets: { hr: '130-145 bpm', pace: '5:30-6:30/km', feel: 'RPE 4-5' } }),
-    longRun: (mins) => ({ type: 'Long Run', zone: 2, duration: mins, distance: Math.round(mins/6), purpose: 'Build endurance', structure: [{ block: 'Easy start', time: '15 min', note: 'Very relaxed' }, { block: 'Main', time: `${mins-20} min`, note: 'Steady Z2' }, { block: 'Cool-down', time: '5 min', note: 'Easy' }], targets: { hr: '130-145 bpm', pace: '5:45-6:30/km' } }),
-    threshold: (reps, mins) => ({ type: 'Threshold', zone: 4, duration: reps*mins + reps*2 + 20, purpose: 'Raise lactate threshold', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + strides' }, { block: 'Main', time: `${reps}×${mins} min`, note: 'Threshold, 2min jog' }, { block: 'Cool-down', time: '10 min', note: 'Easy' }], targets: { hr: '160-170 bpm', pace: '4:20-4:50/km' } }),
-    vo2max: (reps, mins) => ({ type: 'VO₂max Intervals', zone: 5, duration: reps*mins + reps*3 + 20, purpose: 'Expand aerobic ceiling', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + strides' }, { block: 'Main', time: `${reps}×${mins} min`, note: 'Hard, 3min easy' }, { block: 'Cool-down', time: '10 min', note: 'Easy' }], targets: { hr: '170-185 bpm', pace: '3:50-4:20/km' } }),
-    strength: (focus) => ({ type: `Strength: ${focus}`, zone: 'str', duration: 45, purpose: focus === 'Lower' ? 'Leg strength for sled/lunges' : 'Upper body for stations', structure: [{ block: 'Warm-up', time: '8 min', note: 'Bike + dynamic' }, { block: 'Main', time: '30 min', note: 'See exercises' }, { block: 'Cool-down', time: '7 min', note: 'Stretch' }], exercises: focus === 'Lower' ? ['Back Squat 4×6-8', 'RDL 3×8-10', 'Lunges 3×12', 'Leg Press 3×12', 'Calf Raises 3×15'] : ['Pull-ups 4×6-10', 'DB Row 3×10', 'Push Press 3×8', 'Wall Balls 3×20', 'Ski Erg 3×250m'] }),
-    miniSim: (station) => ({ type: 'Mini-Sim', zone: 'sim', duration: 30, distance: 4, purpose: 'Race-specific conditioning', structure: [{ block: 'Warm-up', time: '5 min', note: 'Easy jog' }, { block: 'R1-4', time: '~24 min', note: `4×(1km + ${station})` }, { block: 'Cool-down', time: '5 min', note: 'Walk' }], targets: { splits: '4:25-4:40/km', decay: '<5%' } }),
-    rest: () => ({ type: 'Rest', zone: 'rest', duration: 0, purpose: 'Recovery', structure: [{ block: 'Option', time: '0-20 min', note: 'Rest or light walk' }] }),
-};
-
-const getWeekPlan = (phase) => {
-    const plans = {
-        base: [
-            { day: 'Mon', ...SESSIONS.easyRun(45, 7) },
-            { day: 'Tue', ...SESSIONS.strength('Lower') },
-            { day: 'Wed', ...SESSIONS.easyRun(40, 6) },
-            { day: 'Thu', ...SESSIONS.easyRun(45, 7) },
-            { day: 'Fri', ...SESSIONS.strength('Upper') },
-            { day: 'Sat', ...SESSIONS.longRun(75) },
-            { day: 'Sun', ...SESSIONS.rest() },
-        ],
-        build: [
-            { day: 'Mon', ...SESSIONS.easyRun(50, 8) },
-            { day: 'Tue', ...SESSIONS.strength('Lower') },
-            { day: 'Wed', ...SESSIONS.easyRun(45, 7) },
-            { day: 'Thu', ...SESSIONS.vo2max(5, 4) },
-            { day: 'Fri', ...SESSIONS.strength('Upper') },
-            { day: 'Sat', ...SESSIONS.longRun(100) },
-            { day: 'Sun', ...SESSIONS.threshold(3, 8) },
-        ],
-    };
-    return plans[phase] || plans.base;
-};
-
-// ============================================
-// COMPONENTS
-// ============================================
-
-// Mini sparkline chart
-const MiniChart = ({ data, color = 'var(--blue)', height = 40 }) => {
-    if (!data || data.length < 2) return null;
-    const max = Math.max(...data);
-    const min = Math.min(...data);
+const LineChart = ({ data, dataKey, color = 'var(--blue)', height = 180, showDots = true, label }) => {
+    if (!data || data.length < 2) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>Not enough data</div>;
+    
+    const values = data.map(d => parseFloat(d[dataKey])).filter(Boolean);
+    if (values.length < 2) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>Not enough data</div>;
+    
+    const min = Math.min(...values) * 0.95;
+    const max = Math.max(...values) * 1.05;
     const range = max - min || 1;
     
+    const width = 100;
+    const h = height - 40;
+    const points = values.map((v, i) => ({ x: (i / (values.length - 1)) * width, y: h - ((v - min) / range) * h }));
+    const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+    const areaD = pathD + ` L ${width} ${h} L 0 ${h} Z`;
+    
     return (
-        <div className="mini-chart" style={{ height }}>
-            {data.slice(-12).map((v, i) => (
-                <div key={i} className="mini-chart-bar" style={{ height: `${((v - min) / range) * 100}%`, background: color, minHeight: 4 }} />
-            ))}
+        <div style={{ height, position: 'relative' }}>
+            <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: '100%' }} preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id={`grad-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+                        <stop offset="100%" stopColor={color} stopOpacity="0" />
+                    </linearGradient>
+                </defs>
+                {/* Grid lines */}
+                {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+                    <line key={i} x1="0" y1={p * h} x2={width} y2={p * h} className="chart-grid" />
+                ))}
+                {/* Area */}
+                <path d={areaD} fill={`url(#grad-${dataKey})`} />
+                {/* Line */}
+                <path d={pathD} className="chart-line" stroke={color} />
+                {/* Dots */}
+                {showDots && points.length <= 30 && points.map((p, i) => (
+                    <circle key={i} cx={p.x} cy={p.y} r="3" className="chart-dot" stroke={color} />
+                ))}
+                {/* Labels */}
+                <text x="2" y={h + 14} className="chart-label">{data[0]?.week || data[0]?.month || ''}</text>
+                <text x={width - 2} y={h + 14} className="chart-label" textAnchor="end">{data[data.length-1]?.week || data[data.length-1]?.month || ''}</text>
+                <text x="2" y="10" className="chart-value">{max.toFixed(1)}</text>
+                <text x="2" y={h - 4} className="chart-value">{min.toFixed(1)}</text>
+            </svg>
+            {label && <div style={{ position: 'absolute', top: 8, right: 8, fontSize: 12, color: 'var(--text-tertiary)' }}>{label}</div>}
         </div>
     );
 };
 
-// Time range toggle
+const BarChart = ({ data, dataKey, color = 'var(--blue)', height = 120, label }) => {
+    if (!data || data.length < 1) return <div style={{ height, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>No data</div>;
+    
+    const values = data.map(d => parseFloat(d[dataKey]) || 0);
+    const max = Math.max(...values) || 1;
+    
+    return (
+        <div>
+            {label && <p className="label" style={{ marginBottom: 12 }}>{label}</p>}
+            <div className="bar-chart" style={{ height }}>
+                {data.slice(-12).map((d, i) => (
+                    <div key={i} className="bar" style={{ height: `${(values[data.length - 12 + i] / max) * 100}%`, background: color, opacity: i === data.length - 1 || i === 11 ? 1 : 0.6 }}>
+                        {data.length <= 12 && <span className="bar-label">{d.week?.slice(5) || d.month?.slice(5) || ''}</span>}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ============================================
+// MINI COMPONENTS
+// ============================================
 const TimeToggle = ({ value, onChange }) => (
     <div className="time-toggle">
-        {['W', 'M', 'Y', 'All'].map(t => (
-            <button key={t} className={value === t ? 'active' : ''} onClick={() => onChange(t)}>{t === 'W' ? 'Week' : t === 'M' ? 'Month' : t === 'Y' ? 'Year' : 'All'}</button>
+        {['3M', '6M', '1Y', 'All'].map(t => (
+            <button key={t} className={value === t ? 'active' : ''} onClick={() => onChange(t)}>{t}</button>
         ))}
     </div>
 );
 
-// Metric Card
-const MetricCard = ({ label, value, unit, sub, insight, gradient, color, trend, onClick }) => (
+const StatCard = ({ label, value, unit, change, positive }) => (
+    <div className="stat-card">
+        <p className="label">{label}</p>
+        <p className="stat-value">{value}{unit && <span className="unit">{unit}</span>}</p>
+        {change !== undefined && change !== null && (
+            <p className={`stat-change ${positive ? 'positive' : positive === false ? 'negative' : 'neutral'}`}>
+                {change > 0 ? '+' : ''}{typeof change === 'number' ? change.toFixed(1) : change}
+            </p>
+        )}
+    </div>
+);
+
+const InsightCard = ({ title, detail, color = 'blue' }) => (
+    <div className={`insight-box ${color}`}>
+        <p className="insight-box-title">{title}</p>
+        <p className="insight">{detail}</p>
+    </div>
+);
+
+const MetricCard = ({ label, value, unit, insight, gradient, color, trend, onClick }) => (
     <div className={`card metric-card aurora ${gradient}`} onClick={onClick}>
         <div className="arrow">→</div>
         <div>
@@ -766,431 +452,47 @@ const MetricCard = ({ label, value, unit, sub, insight, gradient, color, trend, 
             {trend && <span className={`trend trend-${trend.type}`} style={{ marginTop: 8 }}>{trend.icon} {trend.text}</span>}
         </div>
         {insight && <p className="insight">{insight}</p>}
-        {sub && <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 4 }}>{sub}</p>}
     </div>
 );
 
-// Session Card
 const SessionCard = ({ session, isToday, onClick }) => (
-    <div className={`card session-card aurora grad-session`} onClick={onClick} style={{ border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)' }}>
+    <div className={`card aurora grad-session`} onClick={onClick} style={{ padding: 20, cursor: 'pointer', border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)' }}>
         <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`}>
             {session.zone === 2 ? '🟢 Z2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'str' ? '💪 Strength' : session.zone === 'sim' ? '🏁 Sim' : '😴 Rest'}
         </span>
-        <p style={{ fontSize: 22, fontWeight: 600, marginBottom: 4 }}>{session.type}</p>
+        <p style={{ fontSize: 22, fontWeight: 600, margin: '10px 0 4px' }}>{session.type}</p>
         <p className="insight">{session.duration > 0 ? formatDuration(session.duration) : 'Rest day'}{session.distance > 0 && ` · ${session.distance}km`}{isToday && ' · Today'}</p>
-        <div style={{ position: 'absolute', bottom: 20, right: 20, opacity: 0.4 }}>→</div>
     </div>
 );
 
-// Data Row
 const DataRow = ({ label, value, sub, trend }) => (
     <div className="data-row">
-        <div>
-            <p className="data-row-label">{label}</p>
-            {sub && <p className="data-row-sub">{sub}</p>}
-        </div>
-        <div style={{ textAlign: 'right' }}>
-            <p className="data-row-value">{value}</p>
-            {trend && <span className={`trend trend-${trend.type}`} style={{ fontSize: 12, padding: '2px 8px', marginTop: 4 }}>{trend.text}</span>}
-        </div>
+        <div><p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>{label}</p>{sub && <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{sub}</p>}</div>
+        <div style={{ textAlign: 'right' }}><p style={{ fontWeight: 600, fontSize: 16 }}>{value}</p>{trend && <span className={`trend trend-${trend.type}`} style={{ fontSize: 12, padding: '2px 8px', marginTop: 4 }}>{trend.text}</span>}</div>
     </div>
 );
 
 // ============================================
-// DETAIL MODALS
+// SESSIONS
 // ============================================
-
-const ReadinessModal = ({ data, history, onClose }) => {
-    const [range, setRange] = useState('W');
-    const filtered = useMemo(() => {
-        const now = Date.now();
-        const cutoffs = { W: 7, M: 30, Y: 365, All: 9999 };
-        return history.filter(d => (now - new Date(d.date)) / 86400000 <= cutoffs[range]);
-    }, [history, range]);
-    
-    return (
-        <div className="modal-overlay open" onClick={onClose}>
-            <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-                <div className="modal-handle" />
-                <div className={`modal-header grad-readiness aurora`}>
-                    <button className="modal-back" onClick={onClose}>←</button>
-                    <p className="label" style={{ marginBottom: 8 }}>READINESS</p>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span className="value-xl">{data.score}</span>
-                        <span style={{ fontSize: 24, opacity: 0.5 }}>/ 100</span>
-                    </div>
-                    <p style={{ fontSize: 17, marginTop: 8, color: 'var(--text-secondary)' }}>{data.message}</p>
-                </div>
-                <div className="modal-body">
-                    <TimeToggle value={range} onChange={setRange} />
-                    
-                    {filtered.length > 1 && (
-                        <div style={{ marginTop: 20, marginBottom: 24 }}>
-                            <MiniChart data={filtered.map(d => d.score || 70)} color="var(--blue)" height={50} />
-                        </div>
-                    )}
-                    
-                    <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>CONTRIBUTING FACTORS</p>
-                    
-                    <DataRow 
-                        label="Resting Heart Rate" 
-                        sub={`7-day avg: ${data.components.hr.avg?.toFixed(0) || '—'} bpm`}
-                        value={`${data.components.hr.value} bpm`}
-                        trend={data.components.hr.diff <= 2 ? { type: 'up', text: '✓ Normal' } : data.components.hr.diff <= 5 ? { type: 'stable', text: '↗ Slightly high' } : { type: 'down', text: '↑ Elevated' }}
-                    />
-                    
-                    <DataRow 
-                        label="Heart Rate Variability" 
-                        sub={`7-day avg: ${data.components.hrv.avg?.toFixed(0) || '—'} ms`}
-                        value={`${data.components.hrv.value || '—'} ms`}
-                        trend={data.components.hrv.value >= data.components.hrv.avg ? { type: 'up', text: '✓ Good' } : { type: 'down', text: '↓ Below avg' }}
-                    />
-                    
-                    <DataRow 
-                        label="Sleep" 
-                        sub="Last night"
-                        value={data.components.sleep.value > 0 ? `${data.components.sleep.value.toFixed(1)}h` : '—'}
-                        trend={data.components.sleep.value >= 7 ? { type: 'up', text: '✓ Good' } : data.components.sleep.value >= 6 ? { type: 'stable', text: '→ Okay' } : data.components.sleep.value > 0 ? { type: 'down', text: '↓ Low' } : { type: 'neutral', text: 'No data' }}
-                    />
-                    
-                    <DataRow 
-                        label="Training Load" 
-                        sub="Yesterday vs average"
-                        value={`${((data.components.load.ratio || 1) * 100).toFixed(0)}%`}
-                        trend={data.components.load.ratio <= 1.2 ? { type: 'up', text: '✓ Balanced' } : data.components.load.ratio <= 1.5 ? { type: 'stable', text: '↗ High' } : { type: 'down', text: '↑ Very high' }}
-                    />
-                    
-                    <div className={`insight-box ${data.color}`}>
-                        <p className="insight-box-title">💡 What this means</p>
-                        <p className="insight">{data.message}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
+const SESSIONS = {
+    easyRun: (mins, km) => ({ type: 'Easy Run', zone: 2, duration: mins, distance: km, purpose: 'Build aerobic base', structure: [{ block: 'Warm-up', time: '5 min', note: 'Walk to jog' }, { block: 'Main', time: `${mins-10} min`, note: 'Easy pace, HR 130-145' }, { block: 'Cool-down', time: '5 min', note: 'Jog to walk' }], targets: { hr: '130-145 bpm', pace: '5:30-6:30/km' } }),
+    longRun: (mins) => ({ type: 'Long Run', zone: 2, duration: mins, distance: Math.round(mins/6), purpose: 'Build endurance', structure: [{ block: 'Easy start', time: '15 min', note: 'Very relaxed' }, { block: 'Main', time: `${mins-20} min`, note: 'Steady Z2' }, { block: 'Cool-down', time: '5 min', note: 'Easy' }], targets: { hr: '130-145 bpm', pace: '5:45-6:30/km' } }),
+    threshold: (reps, mins) => ({ type: 'Threshold', zone: 4, duration: reps*mins + reps*2 + 20, purpose: 'Raise lactate threshold', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + strides' }, { block: 'Main', time: `${reps}×${mins} min`, note: 'Threshold, 2min jog' }, { block: 'Cool-down', time: '10 min', note: 'Easy' }], targets: { hr: '160-170 bpm', pace: '4:20-4:50/km' } }),
+    vo2max: (reps, mins) => ({ type: 'VO₂max Intervals', zone: 5, duration: reps*mins + reps*3 + 20, purpose: 'Expand aerobic ceiling', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + strides' }, { block: 'Main', time: `${reps}×${mins} min`, note: 'Hard, 3min easy' }, { block: 'Cool-down', time: '10 min', note: 'Easy' }], targets: { hr: '170-185 bpm', pace: '3:50-4:20/km' } }),
+    strength: (focus) => ({ type: `Strength: ${focus}`, zone: 'str', duration: 45, purpose: focus === 'Lower' ? 'Leg strength' : 'Upper body for stations', structure: [{ block: 'Warm-up', time: '8 min', note: 'Bike + dynamic' }, { block: 'Main', time: '30 min', note: 'See exercises' }, { block: 'Cool-down', time: '7 min', note: 'Stretch' }], exercises: focus === 'Lower' ? ['Back Squat 4×6-8', 'RDL 3×8-10', 'Lunges 3×12', 'Calf Raises 3×15'] : ['Pull-ups 4×6-10', 'DB Row 3×10', 'Push Press 3×8', 'Wall Balls 3×20'] }),
+    rest: () => ({ type: 'Rest', zone: 'rest', duration: 0, purpose: 'Recovery' }),
 };
 
-const AerobicModal = ({ data, history, onClose }) => {
-    const [range, setRange] = useState('M');
-    
-    return (
-        <div className="modal-overlay open" onClick={onClose}>
-            <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-                <div className="modal-handle" />
-                <div className={`modal-header grad-aerobic aurora`}>
-                    <button className="modal-back" onClick={onClose}>←</button>
-                    <p className="label" style={{ marginBottom: 8 }}>AEROBIC ENGINE</p>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span className="value-xl">{data.vo2max?.toFixed(1)}</span>
-                        <span style={{ fontSize: 20, opacity: 0.5 }}>VO₂max</span>
-                    </div>
-                    <span className={`trend trend-${data.trend === 'improving' ? 'up' : data.trend === 'declining' ? 'down' : 'stable'}`} style={{ marginTop: 12 }}>
-                        {data.trend === 'improving' ? '↑' : data.trend === 'declining' ? '↓' : '→'} {data.trend}
-                    </span>
-                </div>
-                <div className="modal-body">
-                    <TimeToggle value={range} onChange={setRange} />
-                    
-                    {history.vo2?.length > 1 && (
-                        <div style={{ marginTop: 20, marginBottom: 24 }}>
-                            <p className="label" style={{ marginBottom: 8 }}>VO₂MAX TREND</p>
-                            <MiniChart data={history.vo2.slice(range === 'W' ? -7 : range === 'M' ? -30 : -90).map(d => d.vo2)} color="var(--green)" height={50} />
-                        </div>
-                    )}
-                    
-                    <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>KEY METRICS</p>
-                    
-                    <DataRow 
-                        label="VO₂max Estimate" 
-                        sub="From Apple Watch"
-                        value={data.vo2max?.toFixed(1) || '—'}
-                        trend={{ type: 'neutral', text: `Target: ${TARGETS.vo2max}` }}
-                    />
-                    
-                    <DataRow 
-                        label="Weekly Volume" 
-                        sub="Last 7 days"
-                        value={`${data.weeklyVol?.toFixed(1) || 0} km`}
-                        trend={data.weeklyVol >= TARGETS.weeklyVol ? { type: 'up', text: '✓ On target' } : { type: 'stable', text: `Target: ${TARGETS.weeklyVol}km` }}
-                    />
-                    
-                    <DataRow 
-                        label="4-Week Change" 
-                        sub="VO₂max trend"
-                        value={data.vo2Trend > 0 ? `+${data.vo2Trend.toFixed(1)}` : data.vo2Trend?.toFixed(1) || '—'}
-                        trend={data.vo2Trend > 0 ? { type: 'up', text: 'Improving' } : data.vo2Trend < 0 ? { type: 'down', text: 'Declining' } : { type: 'stable', text: 'Stable' }}
-                    />
-                    
-                    {data.weeksToTarget && data.weeksToTarget < 100 && (
-                        <DataRow 
-                            label="Weeks to Target" 
-                            sub="At current rate"
-                            value={Math.round(data.weeksToTarget)}
-                            trend={{ type: data.weeksToTarget < 40 ? 'up' : 'stable', text: data.weeksToTarget < 40 ? 'On track' : 'Keep building' }}
-                        />
-                    )}
-                    
-                    <div className={`insight-box ${data.insight?.color || 'blue'}`}>
-                        <p className="insight-box-title">📊 {data.insight?.headline}</p>
-                        <p className="insight">{data.insight?.detail}</p>
-                    </div>
-                    
-                    <div className="insight-box blue" style={{ marginTop: 12 }}>
-                        <p className="insight-box-title">📚 Research</p>
-                        <p className="insight">Brownlee study: +100km monthly volume = -4.4 minutes race time. Volume is the #1 predictor.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const RaceFitnessModal = ({ data, tests, onClose, onLogTest }) => {
-    const [range, setRange] = useState('All');
-    
-    return (
-        <div className="modal-overlay open" onClick={onClose}>
-            <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-                <div className="modal-handle" />
-                <div className={`modal-header grad-race aurora`}>
-                    <button className="modal-back" onClick={onClose}>←</button>
-                    <p className="label" style={{ marginBottom: 8 }}>RACE FITNESS</p>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span className="value-xl">{data.formatted}</span>
-                    </div>
-                    <p style={{ fontSize: 15, marginTop: 8, color: 'var(--text-secondary)' }}>Predicted finish · {data.confidence} confidence</p>
-                </div>
-                <div className="modal-body">
-                    <p className="label" style={{ marginBottom: 16 }}>PREDICTION BREAKDOWN</p>
-                    
-                    <DataRow label="Estimated Run Time" sub="8km total" value={formatTime(data.breakdown?.runTime)} />
-                    <DataRow label="Estimated Station Time" sub="All 8 stations" value={formatTime(data.breakdown?.stationTime)} />
-                    {data.breakdown?.volumeBonus > 0 && <DataRow label="Volume Bonus" sub="From weekly km" value={`-${data.breakdown.volumeBonus}s`} trend={{ type: 'up', text: 'Helping' }} />}
-                    {data.breakdown?.speedBonus > 0 && <DataRow label="Speed Bonus" sub="From 2km TT" value={`-${data.breakdown.speedBonus}s`} trend={{ type: 'up', text: 'Helping' }} />}
-                    {data.breakdown?.fatiguePenalty > 0 && <DataRow label="Fatigue Penalty" sub="Pace decay" value={`+${data.breakdown.fatiguePenalty}s`} trend={{ type: 'down', text: 'Costing you' }} />}
-                    
-                    <p className="label" style={{ marginBottom: 16, marginTop: 32 }}>BENCHMARK TESTS</p>
-                    
-                    <DataRow 
-                        label="2km Time Trial" 
-                        sub={tests.twoKm?.date || 'Not tested'}
-                        value={tests.twoKm ? formatTime(tests.twoKm.time) : '—'}
-                        trend={{ type: 'neutral', text: `Target: ${formatTime(TARGETS.twoKm)}` }}
-                    />
-                    
-                    <DataRow 
-                        label="Threshold Pace" 
-                        sub={tests.threshold?.date || 'Not tested'}
-                        value={tests.threshold ? formatPace(tests.threshold.pace) : '—'}
-                        trend={{ type: 'neutral', text: `Target: ${formatPace(TARGETS.threshold)}` }}
-                    />
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 24 }}>
-                        <button onClick={() => onLogTest('twoKm')} style={{ padding: 14, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, color: 'white', cursor: 'pointer', fontWeight: 500 }}>Log 2km TT</button>
-                        <button onClick={() => onLogTest('threshold')} style={{ padding: 14, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, color: 'white', cursor: 'pointer', fontWeight: 500 }}>Log 20-min Test</button>
-                    </div>
-                    
-                    <div className={`insight-box ${data.insight?.color || 'blue'}`} style={{ marginTop: 24 }}>
-                        <p className="insight-box-title">🎯 {data.insight?.headline}</p>
-                        <p className="insight">{data.insight?.detail}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
-    return (
-        <div className="modal-overlay open" onClick={onClose}>
-            <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-                <div className="modal-handle" />
-                <div className={`modal-header grad-hyrox aurora`}>
-                    <button className="modal-back" onClick={onClose}>←</button>
-                    <p className="label" style={{ marginBottom: 8 }}>HYROX READY</p>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                        <span className="value-xl">{data.hasSim ? formatTime(data.total) : '—'}</span>
-                    </div>
-                    <p style={{ fontSize: 15, marginTop: 8, color: 'var(--text-secondary)' }}>{data.hasSim ? 'Latest mini-sim' : 'No data yet'}</p>
-                </div>
-                <div className="modal-body">
-                    {data.hasSim ? (
-                        <>
-                            <p className="label" style={{ marginBottom: 16 }}>PERFORMANCE ANALYSIS</p>
-                            
-                            <DataRow 
-                                label="Pace Decay" 
-                                sub="R4 vs R1 (lower is better)"
-                                value={`${data.paceDecay}%`}
-                                trend={data.paceDecay <= 5 ? { type: 'up', text: '✓ Target met' } : data.paceDecay <= 8 ? { type: 'stable', text: 'Room to improve' } : { type: 'down', text: 'Work on this' }}
-                            />
-                            
-                            <DataRow 
-                                label="Split Consistency" 
-                                sub="Variation in 1km times"
-                                value={`${data.splitCV?.toFixed(1) || '—'}%`}
-                                trend={data.splitCV <= 5 ? { type: 'up', text: '✓ Consistent' } : { type: 'stable', text: 'Could be tighter' }}
-                            />
-                            
-                            <DataRow 
-                                label="Total Time" 
-                                sub="4×(1km + station)"
-                                value={formatTime(data.total)}
-                                trend={{ type: 'neutral', text: 'Target: 25:40' }}
-                            />
-                            
-                            {history.length > 1 && (
-                                <div style={{ marginTop: 24 }}>
-                                    <p className="label" style={{ marginBottom: 12 }}>HISTORY</p>
-                                    {history.slice(-5).reverse().map((sim, i) => (
-                                        <div key={i} className="data-row">
-                                            <div>
-                                                <p className="data-row-label">{sim.date}</p>
-                                                <p className="data-row-sub">{sim.station}</p>
-                                            </div>
-                                            <div style={{ textAlign: 'right' }}>
-                                                <p className="data-row-value">{formatTime(sim.total)}</p>
-                                                <p className="data-row-sub">{sim.decay}% decay</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: 40 }}>
-                            <p style={{ fontSize: 48, marginBottom: 16 }}>🏁</p>
-                            <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>No mini-sim logged yet</p>
-                            <p className="insight">Complete a 4×(1km + station) workout to track your HYROX-specific fitness.</p>
-                        </div>
-                    )}
-                    
-                    <button onClick={() => onLogTest('miniSim')} style={{ width: '100%', marginTop: 24, padding: 16, background: 'var(--purple)', border: 'none', borderRadius: 14, color: 'white', fontWeight: 600, cursor: 'pointer', fontSize: 16 }}>Log Mini-Sim</button>
-                    
-                    <div className={`insight-box ${data.insight?.color || 'purple'}`} style={{ marginTop: 24 }}>
-                        <p className="insight-box-title">🏋️ {data.insight?.headline}</p>
-                        <p className="insight">{data.insight?.detail}</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-const SessionModal = ({ session, onClose }) => (
-    <div className="modal-overlay open" onClick={onClose}>
-        <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
-            <div className="modal-handle" />
-            <div className={`modal-header grad-session aurora`}>
-                <button className="modal-back" onClick={onClose}>←</button>
-                <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`} style={{ marginBottom: 12 }}>
-                    {session.zone === 2 ? '🟢 Z2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'str' ? '💪 Strength' : session.zone === 'sim' ? '🏁 Sim' : '😴 Rest'}
-                </span>
-                <p style={{ fontSize: 28, fontWeight: 600 }}>{session.type}</p>
-                <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginTop: 6 }}>{session.duration > 0 ? formatDuration(session.duration) : 'Rest day'}{session.distance > 0 && ` · ${session.distance}km`}</p>
-            </div>
-            <div className="modal-body">
-                <div style={{ padding: 16, background: 'var(--bg-elevated)', borderRadius: 14, marginBottom: 24 }}>
-                    <p style={{ fontWeight: 500, marginBottom: 6 }}>Purpose</p>
-                    <p className="insight">{session.purpose}</p>
-                </div>
-                
-                <p className="label" style={{ marginBottom: 16 }}>SESSION STRUCTURE</p>
-                {session.structure?.map((s, i) => (
-                    <DataRow key={i} label={s.block} sub={s.note} value={s.time} />
-                ))}
-                
-                {session.exercises && (
-                    <>
-                        <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>EXERCISES</p>
-                        {session.exercises.map((ex, i) => (
-                            <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>{ex}</div>
-                        ))}
-                    </>
-                )}
-                
-                {session.targets && (
-                    <>
-                        <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>TARGETS</p>
-                        {Object.entries(session.targets).map(([k, v]) => (
-                            <DataRow key={k} label={k.charAt(0).toUpperCase() + k.slice(1)} value={v} />
-                        ))}
-                    </>
-                )}
-            </div>
-        </div>
-    </div>
-);
-
-const TestModal = ({ type, onClose, onSave }) => {
-    const [value, setValue] = useState('');
-    const [station, setStation] = useState('Row 500m');
-    const [rounds, setRounds] = useState([{r:'',s:''},{r:'',s:''},{r:'',s:''},{r:'',s:''}]);
-    
-    const handleSave = () => {
-        const date = new Date().toISOString().split('T')[0];
-        if (type === 'twoKm' && parseTime(value) > 0) {
-            onSave({ type: 'twoKm', date, time: parseTime(value) });
-        } else if (type === 'threshold' && parseFloat(value) > 0) {
-            const d = parseFloat(value);
-            onSave({ type: 'threshold', date, distance: d, pace: Math.round(1200/d) });
-        } else if (type === 'miniSim') {
-            const parsed = rounds.map(r => ({ run: parseTime(r.r), st: parseTime(r.s) }));
-            const total = parsed.reduce((s,r) => s + r.run + r.st, 0);
-            const decay = parsed[0].run > 0 ? (((parsed[3].run - parsed[0].run) / parsed[0].run) * 100).toFixed(1) : '0';
-            if (total > 0) onSave({ type: 'miniSim', date, station, rounds: parsed, total, decay });
-        }
-        onClose();
-    };
-    
-    return (
-        <div className="modal-overlay open" onClick={onClose}>
-            <div className="modal-content" onClick={e => e.stopPropagation()}>
-                <div className="modal-handle" />
-                <div style={{ padding: 24 }}>
-                    <h2 style={{ fontSize: 22, fontWeight: 600, marginBottom: 24 }}>{type === 'twoKm' ? 'Log 2km Time Trial' : type === 'threshold' ? 'Log 20-min Test' : 'Log Mini-Sim'}</h2>
-                    
-                    {type === 'twoKm' && (
-                        <div>
-                            <p className="label" style={{ marginBottom: 8 }}>Time (m:ss)</p>
-                            <input type="text" placeholder="9:00" value={value} onChange={e => setValue(e.target.value)} style={{ width: '100%', padding: 14, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, color: 'white', fontSize: 17 }} />
-                        </div>
-                    )}
-                    
-                    {type === 'threshold' && (
-                        <div>
-                            <p className="label" style={{ marginBottom: 8 }}>Distance in 20 min (km)</p>
-                            <input type="number" step="0.01" placeholder="4.50" value={value} onChange={e => setValue(e.target.value)} style={{ width: '100%', padding: 14, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, color: 'white', fontSize: 17 }} />
-                        </div>
-                    )}
-                    
-                    {type === 'miniSim' && (
-                        <div>
-                            <p className="label" style={{ marginBottom: 8 }}>Station</p>
-                            <select value={station} onChange={e => setStation(e.target.value)} style={{ width: '100%', padding: 14, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 12, color: 'white', fontSize: 17, marginBottom: 16 }}>
-                                <option>Row 500m</option>
-                                <option>Wall Balls ×30</option>
-                                <option>Ski Erg 500m</option>
-                                <option>Burpees ×15</option>
-                            </select>
-                            {rounds.map((r, i) => (
-                                <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                                    <input type="text" placeholder={`R${i+1} 1km`} value={r.r} onChange={e => { const n=[...rounds]; n[i].r=e.target.value; setRounds(n); }} style={{ padding: 12, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'white', fontSize: 15 }} />
-                                    <input type="text" placeholder="Station" value={r.s} onChange={e => { const n=[...rounds]; n[i].s=e.target.value; setRounds(n); }} style={{ padding: 12, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'white', fontSize: 15 }} />
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                    
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 24 }}>
-                        <button onClick={onClose} style={{ padding: 16, background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 14, color: 'white', cursor: 'pointer', fontWeight: 500 }}>Cancel</button>
-                        <button onClick={handleSave} style={{ padding: 16, background: 'var(--blue)', border: 'none', borderRadius: 14, color: 'white', cursor: 'pointer', fontWeight: 600 }}>Save</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
+const getWeekPlan = () => [
+    { day: 'Mon', ...SESSIONS.easyRun(45, 7) },
+    { day: 'Tue', ...SESSIONS.strength('Lower') },
+    { day: 'Wed', ...SESSIONS.easyRun(40, 6) },
+    { day: 'Thu', ...SESSIONS.easyRun(45, 7) },
+    { day: 'Fri', ...SESSIONS.strength('Upper') },
+    { day: 'Sat', ...SESSIONS.longRun(75) },
+    { day: 'Sun', ...SESSIONS.rest() },
+];
 
 // ============================================
 // MAIN APP
@@ -1202,20 +504,23 @@ function App() {
     const [tests, setTests] = useState(() => storage.get('tests', { twoKm: [], threshold: [], miniSim: [] }));
     const [profile] = useState(() => storage.get('profile', { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15' }));
     const [modal, setModal] = useState(null);
-    const [testModal, setTestModal] = useState(null);
+    const [historyRange, setHistoryRange] = useState('6M');
     
     useEffect(() => { storage.set('tests', tests); }, [tests]);
-    
     useEffect(() => {
-        Promise.all([fetchSheet('Workouts'), fetchSheet('DailyMetrics')]).then(([w, d]) => {
-            setWorkouts(w); setDaily(d);
-        });
+        Promise.all([fetchSheet('Workouts'), fetchSheet('DailyMetrics')]).then(([w, d]) => { setWorkouts(w); setDaily(d); });
     }, []);
     
     const now = Date.now();
     const daysAgo = (d) => now - d * 24 * 60 * 60 * 1000;
     
-    // Process daily metrics
+    // Filter data by range
+    const filterByRange = useCallback((data, range) => {
+        const days = { '3M': 90, '6M': 180, '1Y': 365, 'All': 9999 }[range] || 180;
+        return data.filter(d => new Date(d['Date']) >= daysAgo(days));
+    }, [now]);
+    
+    // Latest metrics
     const latestDaily = useMemo(() => {
         const sorted = [...daily].sort((a, b) => new Date(b['Date']) - new Date(a['Date']));
         return {
@@ -1226,74 +531,47 @@ function App() {
         };
     }, [daily]);
     
-    // Process workout data
+    // Weekly stats
     const workoutStats = useMemo(() => {
         const last7 = workouts.filter(w => new Date(w['Date']) >= daysAgo(7));
-        const last28 = workouts.filter(w => new Date(w['Date']) >= daysAgo(28));
         const weeklyVol = last7.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
-        const yesterdayLoad = workouts.filter(w => {
-            const d = new Date(w['Date']);
-            return d >= daysAgo(2) && d < daysAgo(1);
-        }).reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
-        const avgDailyLoad = last28.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0) / 28;
-        const z2Runs = workouts.filter(w => {
-            const hr = parseFloat(w['Avg HR']) || 0;
-            return hr >= 120 && hr <= 150 && (w['Workout Type'] || '').toLowerCase().includes('run');
-        }).map(w => ({ pace: (parseFloat(w['Duration (min)']) * 60) / (parseFloat(w['Distance (km)']) || 1), hr: parseFloat(w['Avg HR']) || 140 }));
-        return { weeklyVol, yesterdayLoad, avgDailyLoad, z2Runs };
+        return { weeklyVol };
     }, [workouts, now]);
     
-    // History arrays
-    const hrHistory = useMemo(() => daily.map(d => ({ date: d['Date'], hr: parseFloat(d['Resting HR']) || null })).filter(d => d.hr), [daily]);
-    const hrvHistory = useMemo(() => daily.map(d => ({ date: d['Date'], hrv: parseFloat(d['HRV (ms)']) || null })).filter(d => d.hrv), [daily]);
-    const vo2History = useMemo(() => daily.map(d => ({ date: d['Date'], vo2: parseFloat(d['VO2 Max']) || null })).filter(d => d.vo2), [daily]);
-    const volHistory = useMemo(() => {
-        const weeks = []; let weekVol = 0; let count = 0;
-        workouts.forEach(w => { weekVol += parseFloat(w['Distance (km)']) || 0; count++; if (count % 7 === 0) { weeks.push({ vol: weekVol, longRun: true }); weekVol = 0; }});
-        if (weekVol > 0) weeks.push({ vol: weekVol, longRun: true });
-        return weeks;
-    }, [workouts]);
+    // Historical analysis
+    const historicalData = useMemo(() => {
+        const filteredWorkouts = filterByRange(workouts, historyRange);
+        const filteredDaily = filterByRange(daily, historyRange);
+        
+        const weeklyVols = AnalysisEngine.weeklyVolumes(filteredWorkouts);
+        const monthlyStats = AnalysisEngine.monthlyStats(filteredWorkouts, filteredDaily);
+        const vo2Progress = AnalysisEngine.progressRate(filteredDaily, 'VO2 Max');
+        const correlations = AnalysisEngine.findCorrelations(filteredWorkouts, filteredDaily);
+        
+        // Period comparison (last half vs first half)
+        const midpoint = Math.floor(filteredDaily.length / 2);
+        const firstHalf = filteredDaily.slice(0, midpoint);
+        const secondHalf = filteredDaily.slice(midpoint);
+        const comparison = AnalysisEngine.comparePeriods(firstHalf, secondHalf, ['VO2 Max', 'Resting HR']);
+        
+        // Summary stats
+        const totalVolume = weeklyVols.reduce((s, w) => s + w.volume, 0);
+        const avgWeeklyVol = weeklyVols.length ? totalVolume / weeklyVols.length : 0;
+        const peakWeek = Math.max(...weeklyVols.map(w => w.volume));
+        const totalSessions = filteredWorkouts.length;
+        
+        return { weeklyVols, monthlyStats, vo2Progress, correlations, comparison, totalVolume, avgWeeklyVol, peakWeek, totalSessions };
+    }, [workouts, daily, historyRange, filterByRange]);
     
-    // Latest tests
-    const latestTests = useMemo(() => ({
-        twoKm: tests.twoKm[tests.twoKm.length - 1],
-        threshold: tests.threshold[tests.threshold.length - 1],
-        miniSim: tests.miniSim[tests.miniSim.length - 1],
-    }), [tests]);
-    
-    // Calculate insights
-    const readiness = useMemo(() => InsightEngine.calculateReadiness({
-        restingHR: latestDaily.restingHR, hrv: latestDaily.hrv, sleep: latestDaily.sleep,
-        hrHistory, hrvHistory, yesterdayLoad: workoutStats.yesterdayLoad, avgDailyLoad: workoutStats.avgDailyLoad,
-    }), [latestDaily, hrHistory, hrvHistory, workoutStats]);
-    
-    const aerobic = useMemo(() => InsightEngine.calculateAerobic({
-        vo2max: latestDaily.vo2max, weeklyVol: workoutStats.weeklyVol, vo2History, volHistory, z2Runs: workoutStats.z2Runs,
-    }), [latestDaily.vo2max, workoutStats, vo2History, volHistory]);
-    
-    const racePrediction = useMemo(() => InsightEngine.calculateRacePrediction({
-        twoKm: latestTests.twoKm?.time, threshold: latestTests.threshold?.pace,
-        weeklyVol: workoutStats.weeklyVol, paceDecay: latestTests.miniSim ? parseFloat(latestTests.miniSim.decay) : null,
-        vo2max: latestDaily.vo2max,
-    }), [latestTests, workoutStats.weeklyVol, latestDaily.vo2max]);
-    
-    const hyroxReady = useMemo(() => InsightEngine.calculateHyroxReady({
-        latestSim: latestTests.miniSim, simHistory: tests.miniSim,
-    }), [latestTests.miniSim, tests.miniSim]);
-    
-    const limiters = useMemo(() => InsightEngine.detectLimiters({
-        aerobic: aerobic.score, threshold: latestTests.threshold ? 70 : 30,
-        speed: latestTests.twoKm ? 70 : 30, fatigue: hyroxReady.hasSim ? hyroxReady.score : 30,
-    }), [aerobic.score, latestTests, hyroxReady]);
-    
-    const weekPlan = useMemo(() => getWeekPlan('base'), []);
+    // Week plan
+    const weekPlan = useMemo(() => getWeekPlan(), []);
     const todayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date().getDay()];
     const todaySession = weekPlan.find(d => d.day === todayName);
     const daysToRace = Math.max(0, Math.floor((new Date(profile.raceDate) - now) / 86400000));
     
-    const handleTestSave = (result) => setTests(prev => ({ ...prev, [result.type]: [...prev[result.type], result] }));
-    
+    // ============================================
     // HOME TAB
+    // ============================================
     const renderHome = () => (
         <div className="container hide-scrollbar">
             <div className="px-5 py-4">
@@ -1308,50 +586,15 @@ function App() {
             
             <div className="px-5 mb-4">
                 <div className="grid-2 fade-up delay-1">
-                    <MetricCard label="Readiness" value={readiness.score} gradient="grad-readiness"
-                        color={readiness.score >= 70 ? 'var(--green)' : readiness.score >= 55 ? 'var(--yellow)' : 'var(--orange)'}
-                        insight={readiness.message} onClick={() => setModal({ type: 'readiness' })} />
-                    <MetricCard label="Aerobic Engine" value={latestDaily.vo2max?.toFixed(1)} unit="VO₂" gradient="grad-aerobic" color="var(--green)"
-                        trend={aerobic.trend === 'improving' ? { type: 'up', icon: '↑', text: 'Improving' } : { type: 'stable', icon: '→', text: 'Stable' }}
-                        insight={aerobic.insight?.headline} onClick={() => setModal({ type: 'aerobic' })} />
-                </div>
-            </div>
-            <div className="px-5 mb-4">
-                <div className="grid-2 fade-up delay-2">
-                    <MetricCard label="Race Fitness" value={racePrediction.formatted} gradient="grad-race" color="var(--orange)"
-                        insight={racePrediction.insight?.headline} sub={racePrediction.confidence + ' confidence'}
-                        onClick={() => setModal({ type: 'raceFitness' })} />
-                    <MetricCard label="HYROX Ready" value={hyroxReady.hasSim ? formatTime(hyroxReady.total) : '—'} gradient="grad-hyrox" color="var(--purple)"
-                        insight={hyroxReady.insight?.headline}
-                        trend={hyroxReady.hasSim ? { type: hyroxReady.paceDecay <= 5 ? 'up' : 'stable', icon: '✓', text: `${hyroxReady.paceDecay}% decay` } : null}
-                        onClick={() => setModal({ type: 'hyroxReady' })} />
+                    <MetricCard label="VO₂max" value={latestDaily.vo2max?.toFixed(1)} gradient="grad-aerobic" color="var(--green)"
+                        trend={historicalData.vo2Progress?.trend === 'improving' ? { type: 'up', icon: '↑', text: `+${historicalData.vo2Progress.change?.toFixed(1)}` } : { type: 'stable', icon: '→', text: 'Stable' }}
+                        insight={`Target: ${TARGETS.vo2max}`} onClick={() => setTab('history')} />
+                    <MetricCard label="Weekly Volume" value={workoutStats.weeklyVol?.toFixed(0)} unit="km" gradient="grad-race" color="var(--orange)"
+                        insight={`Target: ${TARGETS.weeklyVol}km`} onClick={() => setTab('history')} />
                 </div>
             </div>
             
-            {limiters.length > 0 && (
-                <div className="px-5 mb-4 fade-up delay-3">
-                    <p className="label" style={{ marginBottom: 10 }}>YOUR LIMITER</p>
-                    <div className="card" style={{ padding: 16 }}>
-                        <div className="limiter-badge" style={{ marginBottom: 12 }}>⚠️ {limiters[0].label}</div>
-                        <p className="insight">{limiters[0].action}</p>
-                    </div>
-                </div>
-            )}
-            
-            <div className="px-5 mb-4 fade-up delay-4">
-                <div className="card" style={{ padding: 20 }}>
-                    <div className="flex flex-between flex-center" style={{ marginBottom: 12 }}>
-                        <p className="label">WEEKLY VOLUME</p>
-                        <p style={{ fontWeight: 600 }}>{workoutStats.weeklyVol.toFixed(1)} <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>/ {TARGETS.weeklyVol}km</span></p>
-                    </div>
-                    <div className="progress-bar" style={{ height: 8 }}>
-                        <div className="progress-fill" style={{ width: `${Math.min(100, (workoutStats.weeklyVol / TARGETS.weeklyVol) * 100)}%`, background: workoutStats.weeklyVol >= TARGETS.weeklyVol ? 'var(--green)' : 'var(--blue)' }} />
-                    </div>
-                    {volHistory.length > 1 && <div style={{ marginTop: 16 }}><MiniChart data={volHistory.slice(-8).map(w => w.vol)} color="var(--blue)" height={36} /></div>}
-                </div>
-            </div>
-            
-            <div className="px-5 fade-up delay-5">
+            <div className="px-5 mb-4 fade-up delay-2">
                 <div className="card" style={{ padding: 20 }}>
                     <div className="flex flex-between flex-center">
                         <div>
@@ -1365,10 +608,20 @@ function App() {
                     </div>
                 </div>
             </div>
+            
+            <div className="px-5 fade-up delay-3">
+                <p className="label" style={{ marginBottom: 10 }}>QUICK STATS</p>
+                <div className="stat-grid">
+                    <StatCard label="Resting HR" value={latestDaily.restingHR?.toFixed(0)} unit=" bpm" />
+                    <StatCard label="HRV" value={latestDaily.hrv?.toFixed(0) || '—'} unit=" ms" />
+                </div>
+            </div>
         </div>
     );
     
+    // ============================================
     // PLAN TAB
+    // ============================================
     const renderPlan = () => (
         <div className="container hide-scrollbar">
             <div className="px-5 py-4">
@@ -1383,12 +636,9 @@ function App() {
                                 <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>{item.day}{item.day === todayName && ' · Today'}</p>
                                 <p style={{ fontWeight: 500 }}>{item.type}</p>
                             </div>
-                            <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: 10 }}>
-                                {item.duration > 0 && <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.duration}min</span>}
-                                <span className={`session-badge ${item.zone === 2 ? 'z2' : item.zone === 4 ? 'z4' : item.zone === 5 ? 'z5' : item.zone === 'str' ? 'str' : item.zone === 'sim' ? 'sim' : 'rest'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
-                                    {item.zone === 2 ? 'Z2' : item.zone === 4 ? 'Z4' : item.zone === 5 ? 'Z5' : item.zone === 'str' ? 'STR' : item.zone === 'sim' ? 'SIM' : 'REST'}
-                                </span>
-                            </div>
+                            <span className={`session-badge ${item.zone === 2 ? 'z2' : item.zone === 4 ? 'z4' : item.zone === 5 ? 'z5' : item.zone === 'str' ? 'str' : item.zone === 'sim' ? 'sim' : 'rest'}`} style={{ padding: '4px 10px', fontSize: 11 }}>
+                                {item.zone === 2 ? 'Z2' : item.zone === 4 ? 'Z4' : item.zone === 5 ? 'Z5' : item.zone === 'str' ? 'STR' : item.zone === 'sim' ? 'SIM' : 'REST'}
+                            </span>
                         </div>
                     </div>
                 ))}
@@ -1396,12 +646,156 @@ function App() {
         </div>
     );
     
+    // ============================================
+    // HISTORY TAB
+    // ============================================
+    const renderHistory = () => (
+        <div className="container hide-scrollbar">
+            <div className="px-5 py-4">
+                <h1 style={{ fontSize: 28, fontWeight: 600 }}>History</h1>
+                <p style={{ color: 'var(--text-secondary)' }}>Your training journey</p>
+            </div>
+            
+            <div className="px-5 mb-4">
+                <TimeToggle value={historyRange} onChange={setHistoryRange} />
+            </div>
+            
+            {/* Summary Stats */}
+            <div className="px-5 mb-4 fade-up">
+                <p className="label" style={{ marginBottom: 12 }}>PERIOD SUMMARY</p>
+                <div className="stat-grid">
+                    <StatCard label="Total Volume" value={historicalData.totalVolume?.toFixed(0)} unit=" km" />
+                    <StatCard label="Avg Weekly" value={historicalData.avgWeeklyVol?.toFixed(1)} unit=" km" />
+                    <StatCard label="Peak Week" value={historicalData.peakWeek?.toFixed(0)} unit=" km" />
+                    <StatCard label="Sessions" value={historicalData.totalSessions} />
+                </div>
+            </div>
+            
+            {/* VO2max Trend */}
+            <div className="px-5 mb-4 fade-up delay-1">
+                <div className="card" style={{ padding: 20 }}>
+                    <div className="flex flex-between flex-center" style={{ marginBottom: 4 }}>
+                        <p className="label">VO₂MAX JOURNEY</p>
+                        {historicalData.vo2Progress && (
+                            <span className={`trend trend-${historicalData.vo2Progress.trend === 'improving' ? 'up' : historicalData.vo2Progress.trend === 'declining' ? 'down' : 'stable'}`}>
+                                {historicalData.vo2Progress.change > 0 ? '+' : ''}{historicalData.vo2Progress.change?.toFixed(1)}
+                            </span>
+                        )}
+                    </div>
+                    <LineChart data={filterByRange(daily, historyRange).filter(d => d['VO2 Max'])} dataKey="VO2 Max" color="var(--green)" height={180} />
+                    {historicalData.vo2Progress?.weeksToTarget && historicalData.vo2Progress.weeksToTarget > 0 && historicalData.vo2Progress.weeksToTarget < 100 && (
+                        <p className="insight" style={{ marginTop: 12 }}>At current rate, you'll hit target in ~{Math.round(historicalData.vo2Progress.weeksToTarget)} weeks</p>
+                    )}
+                </div>
+            </div>
+            
+            {/* Weekly Volume */}
+            <div className="px-5 mb-4 fade-up delay-2">
+                <div className="card" style={{ padding: 20 }}>
+                    <p className="label" style={{ marginBottom: 16 }}>WEEKLY VOLUME</p>
+                    <BarChart data={historicalData.weeklyVols} dataKey="volume" color="var(--blue)" height={100} />
+                </div>
+            </div>
+            
+            {/* Monthly Breakdown */}
+            {historicalData.monthlyStats.length > 0 && (
+                <div className="px-5 mb-4 fade-up delay-3">
+                    <div className="card" style={{ padding: 20 }}>
+                        <p className="label" style={{ marginBottom: 16 }}>MONTHLY BREAKDOWN</p>
+                        {historicalData.monthlyStats.slice(-6).map((m, i) => (
+                            <DataRow key={i} 
+                                label={new Date(m.month + '-01').toLocaleDateString('en', { month: 'short', year: 'numeric' })} 
+                                value={`${m.volume.toFixed(0)} km`}
+                                sub={`${m.sessions} sessions`}
+                                trend={m.endVo2 ? { type: 'neutral', text: `VO₂ ${m.endVo2.toFixed(1)}` } : null}
+                            />
+                        ))}
+                    </div>
+                </div>
+            )}
+            
+            {/* Period Comparison */}
+            {historicalData.comparison?.['VO2 Max']?.before > 0 && (
+                <div className="px-5 mb-4 fade-up delay-4">
+                    <div className="card">
+                        <p className="label" style={{ padding: '20px 20px 12px' }}>FIRST HALF vs SECOND HALF</p>
+                        <div className="compare-card">
+                            <div className="compare-period">
+                                <p style={{ fontSize: 24, fontWeight: 600 }}>{historicalData.comparison['VO2 Max'].before.toFixed(1)}</p>
+                                <p className="label">VO₂ Before</p>
+                            </div>
+                            <div className="compare-vs">→</div>
+                            <div className="compare-period">
+                                <p style={{ fontSize: 24, fontWeight: 600, color: historicalData.comparison['VO2 Max'].improved ? 'var(--green)' : 'var(--text)' }}>{historicalData.comparison['VO2 Max'].after.toFixed(1)}</p>
+                                <p className="label">VO₂ After</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Insights */}
+            {historicalData.correlations.length > 0 && (
+                <div className="px-5 mb-4 fade-up delay-5">
+                    <p className="label" style={{ marginBottom: 12 }}>KEY INSIGHTS</p>
+                    {historicalData.correlations.map((insight, i) => (
+                        <InsightCard key={i} title={insight.title} detail={insight.detail} color={insight.color} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+    
+    // ============================================
+    // SESSION MODAL
+    // ============================================
+    const SessionModal = ({ session, onClose }) => (
+        <div className="modal-overlay open" onClick={onClose}>
+            <div className="modal-content hide-scrollbar" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div className={`modal-header grad-session aurora`}>
+                    <button className="modal-back" onClick={onClose}>←</button>
+                    <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`}>{session.zone === 2 ? '🟢 Z2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'str' ? '💪 Strength' : session.zone === 'sim' ? '🏁 Sim' : '😴 Rest'}</span>
+                    <p style={{ fontSize: 28, fontWeight: 600, marginTop: 12 }}>{session.type}</p>
+                    <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginTop: 6 }}>{session.duration > 0 ? formatDuration(session.duration) : 'Rest day'}{session.distance > 0 && ` · ${session.distance}km`}</p>
+                </div>
+                <div className="modal-body">
+                    <div style={{ padding: 16, background: 'var(--bg-elevated)', borderRadius: 14, marginBottom: 24 }}>
+                        <p style={{ fontWeight: 500, marginBottom: 6 }}>Purpose</p>
+                        <p className="insight">{session.purpose}</p>
+                    </div>
+                    {session.structure && (
+                        <>
+                            <p className="label" style={{ marginBottom: 16 }}>SESSION STRUCTURE</p>
+                            {session.structure.map((s, i) => <DataRow key={i} label={s.block} sub={s.note} value={s.time} />)}
+                        </>
+                    )}
+                    {session.exercises && (
+                        <>
+                            <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>EXERCISES</p>
+                            {session.exercises.map((ex, i) => <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>{ex}</div>)}
+                        </>
+                    )}
+                    {session.targets && (
+                        <>
+                            <p className="label" style={{ marginBottom: 16, marginTop: 24 }}>TARGETS</p>
+                            {Object.entries(session.targets).map(([k, v]) => <DataRow key={k} label={k} value={v} />)}
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+    
+    // ============================================
+    // RENDER
+    // ============================================
     return (
         <>
             {tab === 'home' && renderHome()}
             {tab === 'plan' && renderPlan()}
+            {tab === 'history' && renderHistory()}
             
-            {/* Navigation */}
             <nav className="nav">
                 <button className={`nav-item ${tab === 'home' ? 'active' : ''}`} onClick={() => setTab('home')}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
@@ -1411,45 +805,13 @@ function App() {
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <span>Plan</span>
                 </button>
+                <button className={`nav-item ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    <span>History</span>
+                </button>
             </nav>
             
-            {/* Modals */}
-            {modal?.type === 'readiness' && (
-                <ReadinessModal 
-                    data={readiness} 
-                    history={hrHistory.map((h, i) => ({ date: h.date, score: 70 + (hrvHistory[i]?.hrv > 40 ? 10 : 0) - (h.hr > 58 ? 10 : 0) }))}
-                    onClose={() => setModal(null)} 
-                />
-            )}
-            {modal?.type === 'aerobic' && (
-                <AerobicModal 
-                    data={aerobic} 
-                    history={{ vo2: vo2History, vol: volHistory }}
-                    onClose={() => setModal(null)} 
-                />
-            )}
-            {modal?.type === 'raceFitness' && (
-                <RaceFitnessModal 
-                    data={racePrediction} 
-                    tests={latestTests}
-                    onClose={() => setModal(null)}
-                    onLogTest={(t) => { setModal(null); setTestModal(t); }}
-                />
-            )}
-            {modal?.type === 'hyroxReady' && (
-                <HyroxReadyModal 
-                    data={hyroxReady}
-                    history={tests.miniSim}
-                    onClose={() => setModal(null)}
-                    onLogTest={(t) => { setModal(null); setTestModal(t); }}
-                />
-            )}
-            {modal?.type === 'session' && (
-                <SessionModal session={modal.data} onClose={() => setModal(null)} />
-            )}
-            {testModal && (
-                <TestModal type={testModal} onClose={() => setTestModal(null)} onSave={handleTestSave} />
-            )}
+            {modal?.type === 'session' && <SessionModal session={modal.data} onClose={() => setModal(null)} />}
         </>
     );
 }
