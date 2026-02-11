@@ -210,8 +210,11 @@ const fetchSheet = async (name) => {
         const txt = await res.text();
         const json = JSON.parse(txt.substring(47).slice(0,-2));
         const headers = json.table.cols.map(c => c.label || '');
-        return json.table.rows?.map(r => { const o = {}; r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; }); return o; }).filter(o => o['Date']) || [];
-    } catch { return []; }
+        console.log(`[${name}] Headers:`, headers);
+        const data = json.table.rows?.map(r => { const o = {}; r.c?.forEach((c,i) => { if(headers[i]) o[headers[i]] = c?.v ?? c?.f ?? null; }); return o; }).filter(o => o['Date']) || [];
+        console.log(`[${name}] Rows:`, data.length, data.slice(0,3));
+        return data;
+    } catch (e) { console.error(`[${name}] Error:`, e); return []; }
 };
 
 // ============================================
