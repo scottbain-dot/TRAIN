@@ -624,11 +624,10 @@ const fetchSheet = async (name) => {
         const json = JSON.parse(txt.substring(47).slice(0, -2));
         const headers = json.table.cols.map(c => c.label || '');
         
-        const data = json.table.rows?.map(row => {
+        const rawData = json.table.rows?.map(row => {
             const obj = {};
             row.c?.forEach((cell, i) => {
                 if (headers[i]) {
-                    // Use formatted value for dates, raw value for numbers
                     if (headers[i] === 'Date') {
                         obj[headers[i]] = cell?.f || cell?.v || null;
                     } else {
@@ -639,8 +638,33 @@ const fetchSheet = async (name) => {
             return obj;
         }).filter(o => o['Date']) || [];
         
-        console.log(`[${name}] Loaded ${data.length} rows`);
-        return data;
+        // Aggregate rows by date — Health Auto Export writes fragments across multiple rows
+        if (name === CONFIG.sheets.daily) {
+            const byDate = {};
+            rawData.forEach(row => {
+                const d = row['Date'];
+                if (!byDate[d]) byDate[d] = { Date: d };
+                headers.forEach(h => {
+                    if (h && h !== 'Date') {
+                        const val = parseFloat(row[h]);
+                        if (!isNaN(val) && val > 0) {
+                            // For Steps and Calories, sum them; for everything else take latest non-null
+                            if (h === 'Steps' || h === 'Active Calories') {
+                                byDate[d][h] = (byDate[d][h] || 0) + val;
+                            } else {
+                                byDate[d][h] = val;
+                            }
+                        }
+                    }
+                });
+            });
+            const merged = Object.values(byDate);
+            console.log(`[${name}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
+            return merged;
+        }
+        
+        console.log(`[${name}] Loaded ${rawData.length} rows`);
+        return rawData;
     } catch (e) {
         console.error(`[${name}] Error:`, e);
         return [];
@@ -658,7 +682,7 @@ const InsightEngine = {
         // Track which components have real data
         const hasHR = restingHR != null && restingHR > 0;
         const hasHRV = hrv != null && hrv > 0;
-        const hasSleep = sleep != null && sleep > 0;
+        const hasSleep = sleep != null && sleep > 0.5;
         
         // HR Component (0-30) - lower is better
         let hrScore = 15, hrStatus = 'no data', hrDiff = 0;
@@ -1146,7 +1170,7 @@ const ReadinessModal = ({ data, onClose }) => {
                         <ContributorBar 
                             label="Sleep"
                             sublabel="Last night"
-                            value={components.sleep.value > 0 ? `${components.sleep.value.toFixed(1)}h` : '—'}
+                            value={components.sleep.value > 0.5 ? `${components.sleep.value.toFixed(1)}h` : '—'}
                             score={components.sleep.score}
                             maxScore={components.sleep.max}
                             color={components.sleep.status === 'optimal' || components.sleep.status === 'good' ? 'var(--green)' : components.sleep.status === 'fair' ? 'var(--yellow)' : 'var(--orange)'}
@@ -1420,6 +1444,132 @@ const SessionModal = ({ session, onClose }) => (
     </div>
 );
 
+// Volume Detail Modal - shows breakdown of all workouts this week
+const VolumeModal = ({ stats, targetVol, onClose }) => {
+    const { weeklyKm, weeklyMins, weekWorkouts } = stats;
+    
+    // Sort workouts by date
+    const sorted = [...weekWorkouts].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
+    
+    // Group by date
+    const byDate = {};
+    sorted.forEach(w => {
+        const d = w['Date'];
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(w);
+    });
+    
+    // Calculate totals by workout type
+    const byType = {};
+    sorted.forEach(w => {
+        const type = w['Workout Type'] || 'Unknown';
+        if (!byType[type]) byType[type] = { count: 0, km: 0, mins: 0, cal: 0 };
+        byType[type].count++;
+        byType[type].km += parseFloat(w['Distance (km)']) || 0;
+        byType[type].mins += parseFloat(w['Duration (min)']) || 0;
+        byType[type].cal += parseFloat(w['Calories']) || 0;
+    });
+    
+    const runKm = sorted.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
+    const totalSessions = sorted.length;
+    
+    // Day name helper
+    const getDayName = (dateStr) => {
+        const d = new Date(dateStr);
+        return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+    };
+    
+    return (
+        <div className="modal-overlay open" onClick={onClose}>
+            <div className="modal-sheet hide-scrollbar" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div className="modal-hero" style={{ background: 'linear-gradient(135deg, #0a2a4a 0%, #0a1525 60%, #080d12 100%)' }}>
+                    <button className="modal-back" onClick={onClose}>‹</button>
+                    <p className="label" style={{ marginBottom: 12 }}>THIS WEEK</p>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+                        <span className="value-hero" style={{ color: 'var(--blue)' }}>{runKm.toFixed(1)}</span>
+                        <span style={{ fontSize: 20, color: 'var(--text-secondary)' }}>km</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 20, marginTop: 12 }}>
+                        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{totalSessions} sessions</span>
+                        <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{fmt.duration(weeklyMins)} total</span>
+                    </div>
+                    <div className="progress-bar" style={{ marginTop: 16 }}>
+                        <div className="progress-fill" style={{ 
+                            width: `${Math.min(100, (runKm / targetVol) * 100)}%`,
+                            background: runKm >= targetVol ? 'var(--green)' : 'var(--blue)'
+                        }} />
+                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                        {runKm >= targetVol ? '✓ Phase target met' : `${(targetVol - runKm).toFixed(1)}km to phase target (${Math.round(targetVol)}km)`}
+                    </p>
+                </div>
+                
+                <div className="modal-body">
+                    {/* By Type */}
+                    <div className="modal-section">
+                        <p className="label" style={{ marginBottom: 12 }}>BY TYPE</p>
+                        {Object.entries(byType).map(([type, data]) => (
+                            <DataRow 
+                                key={type} 
+                                label={type} 
+                                sublabel={`${data.count} session${data.count > 1 ? 's' : ''}${data.cal > 0 ? ' · ' + data.cal + ' cal' : ''}`}
+                                value={data.km > 0 ? `${data.km.toFixed(1)} km` : fmt.duration(data.mins)}
+                            />
+                        ))}
+                    </div>
+                    
+                    {/* Day by Day */}
+                    <div className="modal-section">
+                        <p className="label" style={{ marginBottom: 12 }}>DAY BY DAY</p>
+                        {Object.entries(byDate).map(([date, sessions]) => (
+                            <div key={date} style={{ marginBottom: 16 }}>
+                                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                                    {getDayName(date)} · {new Date(date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                                </p>
+                                {sessions.map((w, i) => {
+                                    const dist = parseFloat(w['Distance (km)']) || 0;
+                                    const dur = parseFloat(w['Duration (min)']) || 0;
+                                    const hr = parseFloat(w['Avg HR']) || 0;
+                                    const pace = parseFloat(w['Avg Pace (sec/km)']) || 0;
+                                    
+                                    return (
+                                        <div key={i} style={{ 
+                                            padding: '12px 16px', 
+                                            background: 'var(--card-elevated)', 
+                                            borderRadius: 12, 
+                                            marginBottom: 6 
+                                        }}>
+                                            <div className="flex flex-between flex-center">
+                                                <p style={{ fontWeight: 500, fontSize: 15 }}>{w['Workout Type']}</p>
+                                                <p style={{ fontWeight: 600, color: dist > 0 ? 'var(--blue)' : 'var(--cyan)' }}>
+                                                    {dist > 0 ? `${dist.toFixed(1)} km` : fmt.duration(dur)}
+                                                </p>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                                                {dur > 0 && dist > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
+                                                {pace > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
+                                                {hr > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>❤️ {hr} bpm</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {totalSessions === 0 && (
+                        <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)' }}>
+                            <p style={{ fontSize: 48, marginBottom: 16 }}>🏃</p>
+                            <p>No workouts recorded this week yet</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // Test Input Modal
 const TestModal = ({ type, onClose, onSave }) => {
     const [value, setValue] = useState('');
@@ -1681,7 +1831,6 @@ function App() {
         
         // Daily metrics — find most recent row that actually has data
         const sortedDaily = [...daily].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
-        const recent7Daily = sortedDaily.slice(-7);
         
         // Find latest row with actual HR data (skip empty/null rows)
         const findLatest = (field) => {
@@ -1697,16 +1846,28 @@ function App() {
         const sleep = findLatest('Sleep Duration (hr)');
         const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
         
-        const hrAvg7 = math.mean(recent7Daily.map(d => parseFloat(d['Resting HR'])).filter(Boolean));
-        const hrvAvg7 = math.mean(recent7Daily.map(d => parseFloat(d['HRV (ms)'])).filter(Boolean));
+        // 7-day averages — use rows from the last 7 calendar days
+        const recent7Daily = sortedDaily.filter(d => new Date(d['Date']) >= last7);
+        // If no data in last 7 days, fall back to last 7 rows that have data
+        const hrValues7 = recent7Daily.map(d => parseFloat(d['Resting HR'])).filter(v => v > 0);
+        const hrvValues7 = recent7Daily.map(d => parseFloat(d['HRV (ms)'])).filter(v => v > 0);
+        // If still empty, use all available data
+        const allHR = sortedDaily.map(d => parseFloat(d['Resting HR'])).filter(v => v > 0);
+        const allHRV = sortedDaily.map(d => parseFloat(d['HRV (ms)'])).filter(v => v > 0);
         
-        // Yesterday's training load
+        const hrAvg7 = math.mean(hrValues7.length > 0 ? hrValues7 : allHR.slice(-7));
+        const hrvAvg7 = math.mean(hrvValues7.length > 0 ? hrvValues7 : allHRV.slice(-7));
+        
+        console.log('[Readiness Debug]', { restingHR, hrv, sleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
+        
+        // Yesterday's training load — compare to average daily load over last 30 days
+        const last30Workouts = workouts.filter(w => new Date(w['Date']) >= last30);
         const yesterday = daysAgo(1).toISOString().split('T')[0];
         const yesterdayWorkouts = workouts.filter(w => w['Date'] === yesterday);
         const yesterdayLoad = yesterdayWorkouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
-        const avgDailyLoad = workouts.length > 0 
-            ? workouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0) / Math.max(30, workouts.length / 2) 
-            : 45;
+        // Average daily load = total training minutes in last 30 days / 30
+        const totalMinsLast30 = last30Workouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
+        const avgDailyLoad = totalMinsLast30 / 30 || 45;
         
         // VO2 and volume history
         const vo2History = sortedDaily.map(d => parseFloat(d['VO2 Max'])).filter(Boolean);
@@ -1734,7 +1895,7 @@ function App() {
         };
         
         return {
-            workoutStats: { weeklyKm, weeklyMins },
+            workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
             latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
             readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, yesterdayLoad, avgLoad: avgDailyLoad },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
@@ -1760,7 +1921,7 @@ function App() {
     const racePrediction = computedData ? InsightEngine.racePrediction(computedData.raceInput) : { predicted: 0, formatted: '—', gap: 0, confidence: 'low', breakdown: {}, insight: { title: '', text: '', color: 'blue' } };
     const hyroxReady = computedData ? InsightEngine.hyroxReady(computedData.hyroxInput) : { score: null, hasSim: false, insight: { title: '', text: '', color: 'blue' } };
     
-    const workoutStats = computedData?.workoutStats || { weeklyKm: 0, weeklyMins: 0 };
+    const workoutStats = computedData?.workoutStats || { weeklyKm: 0, weeklyMins: 0, weekWorkouts: [] };
     const latestDaily = computedData?.latestDaily || {};
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
@@ -1838,10 +1999,10 @@ function App() {
                 </div>
             </div>
             
-            {/* Volume Cards */}
+            {/* Volume Cards — clickable for breakdown */}
             <div className="px-5 mb-4 fade-up delay-3">
                 <div className="grid-2">
-                    <div className="card" style={{ padding: 20 }}>
+                    <div className="card" style={{ padding: 20, cursor: 'pointer' }} onClick={() => setModal({ type: 'volume' })}>
                         <p className="label">RUNNING</p>
                         <p style={{ fontSize: 32, fontWeight: 600, color: 'var(--blue)', margin: '8px 0' }}>
                             {workoutStats.weeklyKm.toFixed(1)}<span className="unit">km</span>
@@ -1852,14 +2013,14 @@ function App() {
                                 background: workoutStats.weeklyKm >= currentTargetVol ? 'var(--green)' : 'var(--blue)'
                             }} />
                         </div>
-                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>Phase target: {Math.round(currentTargetVol)}km</p>
+                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>Phase target: {Math.round(currentTargetVol)}km · Tap for details</p>
                     </div>
-                    <div className="card" style={{ padding: 20 }}>
+                    <div className="card" style={{ padding: 20, cursor: 'pointer' }} onClick={() => setModal({ type: 'volume' })}>
                         <p className="label">TRAINING TIME</p>
                         <p style={{ fontSize: 32, fontWeight: 600, color: 'var(--cyan)', margin: '8px 0' }}>
                             {(workoutStats.weeklyMins / 60).toFixed(1)}<span className="unit">hrs</span>
                         </p>
-                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>This week total</p>
+                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 8 }}>This week total · Tap for details</p>
                     </div>
                 </div>
             </div>
@@ -2186,6 +2347,9 @@ function App() {
             )}
             {modal?.type === 'session' && (
                 <SessionModal session={modal.data} onClose={() => setModal(null)} />
+            )}
+            {modal?.type === 'volume' && (
+                <VolumeModal stats={workoutStats} targetVol={currentTargetVol} onClose={() => setModal(null)} />
             )}
             {testModal && (
                 <TestModal type={testModal} onClose={() => setTestModal(null)} onSave={handleTestSave} />
