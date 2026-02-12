@@ -664,6 +664,50 @@ const fetchSheet = async (name) => {
         }
         
         console.log(`[${name}] Loaded ${rawData.length} rows`);
+        
+        // Clean up workout durations — Health Auto Export sometimes sends seconds instead of minutes
+        if (name === CONFIG.sheets.workouts) {
+            rawData.forEach(w => {
+                let dur = parseFloat(w['Duration (min)']) || 0;
+                const dist = parseFloat(w['Distance (km)']) || 0;
+                
+                if (dur <= 0) return;
+                
+                // Method 1: If we have distance, check if pace is impossible (>30 min/km means dur is in seconds)
+                if (dist > 0) {
+                    const paceMinPerKm = dur / dist;
+                    if (paceMinPerKm > 30) {
+                        // Duration is almost certainly in seconds
+                        w['Duration (min)'] = (dur / 60).toFixed(1);
+                        return;
+                    }
+                }
+                
+                // Method 2: No distance — use calorie rate as sanity check
+                // A reasonable workout burns 5-20 cal/min. If cal/min < 2, dur is likely in seconds
+                const cal = parseFloat(w['Calories']) || 0;
+                if (cal > 0 && dur > 60) {
+                    const calPerMin = cal / dur;
+                    if (calPerMin < 1.5) {
+                        w['Duration (min)'] = (dur / 60).toFixed(1);
+                        return;
+                    }
+                }
+            });
+            
+            // Deduplicate workouts client-side (date + type + similar duration)
+            const seen = new Set();
+            rawData = rawData.filter(w => {
+                const dur = Math.round(parseFloat(w['Duration (min)']) || 0);
+                const key = `${w['Date']}|${w['Workout Type']}|${dur}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            
+            console.log(`[Workouts] After cleanup: ${rawData.length} workouts`);
+        }
+        
         return rawData;
     } catch (e) {
         console.error(`[${name}] Error:`, e);
@@ -675,42 +719,94 @@ const fetchSheet = async (name) => {
 // INSIGHT ENGINE
 // ============================================
 const InsightEngine = {
-    // Calculate Readiness Score (0-100)
+    // Calculate Readiness Score (0-100) — Oura/WHOOP-inspired
     readiness: (data) => {
-        const { restingHR, hrv, sleep, hrAvg7, hrvAvg7, yesterdayLoad, avgLoad } = data;
+        const { restingHR, hrv, sleep, hrAvg7, hrvAvg7, 
+                hrvAvg14, hrvBaseline60, hrvTrend3d, 
+                trimpYesterday, trimpAvg7 } = data;
         
         // Track which components have real data
         const hasHR = restingHR != null && restingHR > 0;
         const hasHRV = hrv != null && hrv > 0;
         const hasSleep = sleep != null && sleep > 0.5;
+        const hasHRVBalance = hrvAvg14 > 0 && hrvBaseline60 > 0;
         
-        // HR Component (0-30) - lower is better
-        let hrScore = 15, hrStatus = 'no data', hrDiff = 0;
+        // ═══════════════════════════════════════
+        // HR Component (0-25) — lower is better vs 7-day avg
+        // ═══════════════════════════════════════
+        let hrScore = 12, hrStatus = 'no data', hrDiff = 0;
         if (hasHR && hrAvg7 > 0) {
             hrDiff = ((restingHR - hrAvg7) / hrAvg7) * 100;
-            hrScore = hrDiff <= -3 ? 30 : hrDiff <= 0 ? 27 : hrDiff <= 3 ? 22 : hrDiff <= 6 ? 15 : 8;
+            hrScore = hrDiff <= -3 ? 25 : hrDiff <= 0 ? 22 : hrDiff <= 3 ? 18 : hrDiff <= 6 ? 12 : 6;
             hrStatus = hrDiff <= 0 ? 'optimal' : hrDiff <= 3 ? 'normal' : hrDiff <= 6 ? 'elevated' : 'high';
         }
         
-        // HRV Component (0-30) - higher is better
-        let hrvScore = 15, hrvStatus = 'no data', hrvDiff = 0;
-        if (hasHRV && hrvAvg7 > 0) {
-            hrvDiff = ((hrv - hrvAvg7) / hrvAvg7) * 100;
-            hrvScore = hrvDiff >= 10 ? 30 : hrvDiff >= 0 ? 25 : hrvDiff >= -10 ? 18 : hrvDiff >= -20 ? 12 : 6;
-            hrvStatus = hrvDiff >= 5 ? 'strong' : hrvDiff >= -5 ? 'normal' : hrvDiff >= -15 ? 'low' : 'depleted';
+        // ═══════════════════════════════════════
+        // HRV Component (0-30) — Oura-style HRV Balance
+        // Compares 14-day weighted avg to 60-day baseline
+        // Only flags "depleted" if trend declining 3+ days
+        // ═══════════════════════════════════════
+        let hrvScore = 15, hrvStatus = 'no data', hrvBalancePct = 0;
+        if (hasHRVBalance) {
+            // HRV Balance: how does recent (14d weighted) compare to baseline (60d)?
+            hrvBalancePct = ((hrvAvg14 - hrvBaseline60) / hrvBaseline60) * 100;
+            
+            // Trend matters: is HRV declining over last 3 days?
+            const isTrendingDown = hrvTrend3d < -5; // 3-day slope negative >5%
+            
+            if (hrvBalancePct >= 5) {
+                hrvScore = 30;
+                hrvStatus = 'strong';
+            } else if (hrvBalancePct >= -5) {
+                hrvScore = isTrendingDown ? 20 : 25;
+                hrvStatus = isTrendingDown ? 'declining' : 'normal';
+            } else if (hrvBalancePct >= -15) {
+                hrvScore = isTrendingDown ? 12 : 16;
+                hrvStatus = isTrendingDown ? 'low' : 'below avg';
+            } else {
+                hrvScore = isTrendingDown ? 6 : 10;
+                hrvStatus = 'depleted';
+            }
+        } else if (hasHRV && hrvAvg7 > 0) {
+            // Fallback: simple comparison to 7-day avg (less than 14 days of data)
+            hrvBalancePct = ((hrv - hrvAvg7) / hrvAvg7) * 100;
+            hrvScore = hrvBalancePct >= 5 ? 28 : hrvBalancePct >= -5 ? 22 : hrvBalancePct >= -15 ? 14 : 8;
+            hrvStatus = hrvBalancePct >= 5 ? 'strong' : hrvBalancePct >= -5 ? 'normal' : hrvBalancePct >= -15 ? 'low' : 'depleted';
         }
         
+        // ═══════════════════════════════════════
         // Sleep Component (0-25)
+        // ═══════════════════════════════════════
         let sleepScore = 12, sleepStatus = 'no data';
         if (hasSleep) {
             sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
             sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
         }
         
-        // Load Component (0-15)
-        const loadRatio = avgLoad > 0 ? yesterdayLoad / avgLoad : 1;
-        const loadScore = loadRatio <= 0.8 ? 15 : loadRatio <= 1.2 ? 13 : loadRatio <= 1.5 ? 10 : loadRatio <= 2 ? 6 : 3;
-        const loadStatus = loadRatio <= 0.8 ? 'light' : loadRatio <= 1.2 ? 'normal' : loadRatio <= 1.5 ? 'moderate' : 'heavy';
+        // ═══════════════════════════════════════
+        // Training Load (0-20) — TRIMP-based
+        // TRIMP = Duration × (Avg HR / Max HR)
+        // Compare yesterday's TRIMP to 7-day rolling avg
+        // ═══════════════════════════════════════
+        let loadScore = 10, loadRatio = 1, loadStatus = 'no data';
+        if (trimpAvg7 > 0) {
+            loadRatio = trimpYesterday / trimpAvg7;
+            if (loadRatio <= 0.3) {
+                loadScore = 18; loadStatus = 'rest day';
+            } else if (loadRatio <= 0.8) {
+                loadScore = 20; loadStatus = 'light';
+            } else if (loadRatio <= 1.2) {
+                loadScore = 16; loadStatus = 'normal';
+            } else if (loadRatio <= 1.5) {
+                loadScore = 12; loadStatus = 'moderate';
+            } else if (loadRatio <= 2.0) {
+                loadScore = 8; loadStatus = 'heavy';
+            } else {
+                loadScore = 4; loadStatus = 'overreaching';
+            }
+        } else if (trimpYesterday === 0) {
+            loadScore = 18; loadStatus = 'rest day';
+        }
         
         const total = hrScore + hrvScore + sleepScore + loadScore;
         
@@ -726,10 +822,10 @@ const InsightEngine = {
             score: total,
             message: getMessage(total),
             components: {
-                hr: { score: hrScore, max: 30, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
-                hrv: { score: hrvScore, max: 30, value: hrv, avg: hrvAvg7, diff: hrvDiff, status: hrvStatus },
+                hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
+                hrv: { score: hrvScore, max: 30, value: hrv, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
                 sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus },
-                load: { score: loadScore, max: 15, ratio: loadRatio, status: loadStatus }
+                load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
         };
     },
@@ -1159,11 +1255,13 @@ const ReadinessModal = ({ data, onClose }) => {
                         
                         <ContributorBar 
                             label="Heart Rate Variability"
-                            sublabel={`7-day avg: ${components.hrv.avg?.toFixed(0) || '—'} ms`}
+                            sublabel={components.hrv.baseline60 > 0 
+                                ? `Balance: ${components.hrv.balance >= 0 ? '+' : ''}${components.hrv.balance?.toFixed(0)}% vs 60-day avg`
+                                : `7-day avg: ${hrvAvg7?.toFixed(0) || '—'} ms`}
                             value={`${components.hrv.value?.toFixed(0) || '—'} ms`}
                             score={components.hrv.score}
                             maxScore={components.hrv.max}
-                            color={components.hrv.status === 'strong' || components.hrv.status === 'normal' ? 'var(--green)' : 'var(--orange)'}
+                            color={components.hrv.status === 'strong' || components.hrv.status === 'normal' ? 'var(--green)' : components.hrv.status === 'declining' || components.hrv.status === 'below avg' ? 'var(--yellow)' : 'var(--orange)'}
                             status={components.hrv.status}
                         />
                         
@@ -1179,11 +1277,13 @@ const ReadinessModal = ({ data, onClose }) => {
                         
                         <ContributorBar 
                             label="Training Load"
-                            sublabel="Yesterday vs average"
-                            value={`${Math.round(components.load.ratio * 100)}%`}
+                            sublabel={components.load.trimp > 0 
+                                ? `TRIMP: ${components.load.trimp.toFixed(0)} vs avg ${components.load.avg.toFixed(0)}/day`
+                                : 'Yesterday vs 7-day average'}
+                            value={components.load.status === 'rest day' ? 'Rest' : `${Math.round(components.load.ratio * 100)}%`}
                             score={components.load.score}
                             maxScore={components.load.max}
-                            color={components.load.status === 'light' || components.load.status === 'normal' ? 'var(--green)' : 'var(--orange)'}
+                            color={components.load.status === 'rest day' || components.load.status === 'light' || components.load.status === 'normal' ? 'var(--green)' : components.load.status === 'moderate' ? 'var(--yellow)' : 'var(--orange)'}
                             status={components.load.status}
                         />
                     </div>
@@ -1860,14 +1960,64 @@ function App() {
         
         console.log('[Readiness Debug]', { restingHR, hrv, sleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
         
-        // Yesterday's training load — compare to average daily load over last 30 days
-        const last30Workouts = workouts.filter(w => new Date(w['Date']) >= last30);
+        // ═══ HRV Balance (Oura-style): 14-day weighted avg vs 60-day baseline ═══
+        const last14 = daysAgo(14);
+        const last60 = daysAgo(60);
+        const allHRVWithDates = sortedDaily
+            .map(d => ({ date: new Date(d['Date']), hrv: parseFloat(d['HRV (ms)']) }))
+            .filter(d => d.hrv > 0);
+        
+        // 14-day weighted average (recent 5 days weighted 2x)
+        const hrv14 = allHRVWithDates.filter(d => d.date >= last14);
+        let hrvAvg14 = 0;
+        if (hrv14.length >= 3) {
+            const fiveDaysAgo = daysAgo(5);
+            let weightedSum = 0, totalWeight = 0;
+            hrv14.forEach(d => {
+                const weight = d.date >= fiveDaysAgo ? 2 : 1;
+                weightedSum += d.hrv * weight;
+                totalWeight += weight;
+            });
+            hrvAvg14 = weightedSum / totalWeight;
+        }
+        
+        // 60-day baseline
+        const hrv60 = allHRVWithDates.filter(d => d.date >= last60);
+        const hrvBaseline60 = hrv60.length >= 7 ? math.mean(hrv60.map(d => d.hrv)) : 0;
+        
+        // 3-day trend: are last 3 readings declining?
+        const last3HRV = allHRVWithDates.slice(-3);
+        let hrvTrend3d = 0;
+        if (last3HRV.length === 3) {
+            const avg3 = math.mean(last3HRV.map(d => d.hrv));
+            const avgPrior = hrvAvg14 > 0 ? hrvAvg14 : hrvAvg7;
+            if (avgPrior > 0) hrvTrend3d = ((avg3 - avgPrior) / avgPrior) * 100;
+        }
+        
+        // ═══ TRIMP-based Training Load ═══
+        // TRIMP = duration_mins × (avgHR / maxHR)
+        // maxHR estimated as 220 - age (42) = 178
+        const maxHR = 178;
+        const calcTrimp = (workout) => {
+            const dur = parseFloat(workout['Duration (min)']) || 0;
+            const avgHR = parseFloat(workout['Avg HR']) || 0;
+            if (dur <= 0) return 0;
+            if (avgHR <= 0) return dur * 0.5; // No HR data: assume moderate effort
+            return dur * (avgHR / maxHR);
+        };
+        
+        // Yesterday's TRIMP
         const yesterday = daysAgo(1).toISOString().split('T')[0];
         const yesterdayWorkouts = workouts.filter(w => w['Date'] === yesterday);
-        const yesterdayLoad = yesterdayWorkouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
-        // Average daily load = total training minutes in last 30 days / 30
-        const totalMinsLast30 = last30Workouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
-        const avgDailyLoad = totalMinsLast30 / 30 || 45;
+        const trimpYesterday = yesterdayWorkouts.reduce((s, w) => s + calcTrimp(w), 0);
+        
+        // 7-day rolling average TRIMP per day
+        const last7Workouts = workouts.filter(w => new Date(w['Date']) >= last7);
+        const trimpLast7 = last7Workouts.reduce((s, w) => s + calcTrimp(w), 0);
+        const trimpAvg7 = trimpLast7 / 7;
+        
+        console.log('[TRIMP Debug]', { trimpYesterday: trimpYesterday.toFixed(1), trimpAvg7: trimpAvg7.toFixed(1), yesterdayWorkoutCount: yesterdayWorkouts.length, last7WorkoutCount: last7Workouts.length });
+        console.log('[HRV Balance Debug]', { hrvAvg14: hrvAvg14.toFixed(1), hrvBaseline60: hrvBaseline60.toFixed(1), hrvTrend3d: hrvTrend3d.toFixed(1), hrv14Count: hrv14.length, hrv60Count: hrv60.length });
         
         // VO2 and volume history
         const vo2History = sortedDaily.map(d => parseFloat(d['VO2 Max'])).filter(Boolean);
@@ -1897,7 +2047,7 @@ function App() {
         return {
             workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
             latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
-            readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, yesterdayLoad, avgLoad: avgDailyLoad },
+            readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
             raceInput: { 
                 twoKm: latestTests.twoKm?.time || 0, 
