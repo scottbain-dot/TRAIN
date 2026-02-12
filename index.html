@@ -655,19 +655,33 @@ const InsightEngine = {
     readiness: (data) => {
         const { restingHR, hrv, sleep, hrAvg7, hrvAvg7, yesterdayLoad, avgLoad } = data;
         
+        // Track which components have real data
+        const hasHR = restingHR != null && restingHR > 0;
+        const hasHRV = hrv != null && hrv > 0;
+        const hasSleep = sleep != null && sleep > 0;
+        
         // HR Component (0-30) - lower is better
-        const hrDiff = hrAvg7 > 0 ? ((restingHR - hrAvg7) / hrAvg7) * 100 : 0;
-        const hrScore = hrDiff <= -3 ? 30 : hrDiff <= 0 ? 27 : hrDiff <= 3 ? 22 : hrDiff <= 6 ? 15 : 8;
-        const hrStatus = hrDiff <= 0 ? 'optimal' : hrDiff <= 3 ? 'normal' : hrDiff <= 6 ? 'elevated' : 'high';
+        let hrScore = 15, hrStatus = 'no data', hrDiff = 0;
+        if (hasHR && hrAvg7 > 0) {
+            hrDiff = ((restingHR - hrAvg7) / hrAvg7) * 100;
+            hrScore = hrDiff <= -3 ? 30 : hrDiff <= 0 ? 27 : hrDiff <= 3 ? 22 : hrDiff <= 6 ? 15 : 8;
+            hrStatus = hrDiff <= 0 ? 'optimal' : hrDiff <= 3 ? 'normal' : hrDiff <= 6 ? 'elevated' : 'high';
+        }
         
         // HRV Component (0-30) - higher is better
-        const hrvDiff = hrvAvg7 > 0 ? ((hrv - hrvAvg7) / hrvAvg7) * 100 : 0;
-        const hrvScore = hrvDiff >= 10 ? 30 : hrvDiff >= 0 ? 25 : hrvDiff >= -10 ? 18 : hrvDiff >= -20 ? 12 : 6;
-        const hrvStatus = hrvDiff >= 5 ? 'strong' : hrvDiff >= -5 ? 'normal' : hrvDiff >= -15 ? 'low' : 'depleted';
+        let hrvScore = 15, hrvStatus = 'no data', hrvDiff = 0;
+        if (hasHRV && hrvAvg7 > 0) {
+            hrvDiff = ((hrv - hrvAvg7) / hrvAvg7) * 100;
+            hrvScore = hrvDiff >= 10 ? 30 : hrvDiff >= 0 ? 25 : hrvDiff >= -10 ? 18 : hrvDiff >= -20 ? 12 : 6;
+            hrvStatus = hrvDiff >= 5 ? 'strong' : hrvDiff >= -5 ? 'normal' : hrvDiff >= -15 ? 'low' : 'depleted';
+        }
         
         // Sleep Component (0-25)
-        const sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : sleep > 0 ? 5 : 15;
-        const sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : sleep > 0 ? 'poor' : 'unknown';
+        let sleepScore = 12, sleepStatus = 'no data';
+        if (hasSleep) {
+            sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
+            sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
+        }
         
         // Load Component (0-15)
         const loadRatio = avgLoad > 0 ? yesterdayLoad / avgLoad : 1;
@@ -1665,15 +1679,23 @@ function App() {
         const weeklyKm = weekWorkouts.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
         const weeklyMins = weekWorkouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
         
-        // Daily metrics
+        // Daily metrics — find most recent row that actually has data
         const sortedDaily = [...daily].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
         const recent7Daily = sortedDaily.slice(-7);
-        const latestD = sortedDaily[sortedDaily.length - 1] || {};
         
-        const restingHR = parseFloat(latestD['Resting HR']) || 0;
-        const hrv = parseFloat(latestD['HRV (ms)']) || 0;
-        const sleep = parseFloat(latestD['Sleep Duration (hr)']) || 0;
-        const vo2max = parseFloat(latestD['VO2 Max']) || CONFIG.baselines.vo2max;
+        // Find latest row with actual HR data (skip empty/null rows)
+        const findLatest = (field) => {
+            for (let i = sortedDaily.length - 1; i >= 0; i--) {
+                const val = parseFloat(sortedDaily[i][field]);
+                if (val > 0) return val;
+            }
+            return null;
+        };
+        
+        const restingHR = findLatest('Resting HR');
+        const hrv = findLatest('HRV (ms)');
+        const sleep = findLatest('Sleep Duration (hr)');
+        const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
         
         const hrAvg7 = math.mean(recent7Daily.map(d => parseFloat(d['Resting HR'])).filter(Boolean));
         const hrvAvg7 = math.mean(recent7Daily.map(d => parseFloat(d['HRV (ms)'])).filter(Boolean));
@@ -1713,7 +1735,7 @@ function App() {
         
         return {
             workoutStats: { weeklyKm, weeklyMins },
-            latestDaily: { restingHR, hrv, sleep, vo2max },
+            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
             readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, yesterdayLoad, avgLoad: avgDailyLoad },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
             raceInput: { 
