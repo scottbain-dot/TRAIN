@@ -282,7 +282,7 @@ function processMetrics(spreadsheet, metrics) {
     if (metric.data && Array.isArray(metric.data)) {
 
       // ── SLEEP: Handle at the metric level (needs all data points at once) ──
-      if (metric.name && metric.name.toLowerCase() === 'sleep_analysis') {
+      if (metric.name && metric.name.toLowerCase().replace(/[\s_]/g, '') === 'sleepanalysis') {
         processSleepAnalysis(spreadsheet, metric.data, metricsByDate);
         return; // Next metric
       }

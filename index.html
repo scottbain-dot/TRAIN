@@ -642,6 +642,17 @@ const fetchSheet = async (name) => {
         if (name === CONFIG.sheets.daily) {
             const byDate = {};
             const sleepCols = new Set(['Sleep Duration (hr)', 'Deep Sleep (hr)', 'REM Sleep (hr)']);
+            // Bounds for physiological sanity — discard values outside these ranges
+            const metricBounds = {
+                'Resting HR': { min: 30, max: 120 },
+                'HRV (ms)': { min: 1, max: 250 },
+                'Walking HR': { min: 40, max: 200 },
+                'Walking HR Avg': { min: 40, max: 200 },
+                'VO2 Max': { min: 20, max: 80 },
+                'Sleep Duration (hr)': { min: 0, max: 16 },
+                'Deep Sleep (hr)': { min: 0, max: 8 },
+                'REM Sleep (hr)': { min: 0, max: 8 },
+            };
             rawData.forEach(row => {
                 const d = row['Date'];
                 if (!byDate[d]) byDate[d] = { Date: d };
@@ -649,6 +660,12 @@ const fetchSheet = async (name) => {
                     if (h && h !== 'Date') {
                         const val = parseFloat(row[h]);
                         if (!isNaN(val) && val > 0) {
+                            // Bounds check: discard physiologically impossible values
+                            const bounds = metricBounds[h];
+                            if (bounds && (val < bounds.min || val > bounds.max)) {
+                                console.log(`[DailyMetrics] Discarding ${h}=${val} on ${d} (bounds: ${bounds.min}-${bounds.max})`);
+                                return;
+                            }
                             if (h === 'Steps' || h === 'Active Calories') {
                                 // Sum accumulative metrics
                                 byDate[d][h] = (byDate[d][h] || 0) + val;
@@ -664,7 +681,8 @@ const fetchSheet = async (name) => {
                 });
             });
             const merged = Object.values(byDate);
-            console.log(`[${name}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
+            const sleepRows = merged.filter(r => r['Sleep Duration (hr)'] > 0);
+            console.log(`[${name}] ${rawData.length} raw rows → ${merged.length} days, ${sleepRows.length} with sleep data`);
             return merged;
         }
         
@@ -675,31 +693,51 @@ const fetchSheet = async (name) => {
             rawData.forEach(w => {
                 let dur = parseFloat(w['Duration (min)']) || 0;
                 const dist = parseFloat(w['Distance (km)']) || 0;
-                
+
                 if (dur <= 0) return;
-                
+
                 // Method 1: If we have distance, check if pace is impossible (>30 min/km means dur is in seconds)
                 if (dist > 0) {
                     const paceMinPerKm = dur / dist;
                     if (paceMinPerKm > 30) {
-                        // Duration is almost certainly in seconds
                         w['Duration (min)'] = (dur / 60).toFixed(1);
                         return;
                     }
                 }
-                
+
                 // Method 2: No distance — use calorie rate as sanity check
-                // A reasonable workout burns 5-20 cal/min. If cal/min < 2, dur is likely in seconds
+                // A reasonable workout burns 5-20 cal/min. If cal/min < 1, dur is likely in seconds
                 const cal = parseFloat(w['Calories']) || 0;
-                if (cal > 0 && dur > 60) {
+                if (cal > 0) {
                     const calPerMin = cal / dur;
-                    if (calPerMin < 1.5) {
+                    const calPerMinConverted = cal / (dur / 60);
+                    // If current rate is unrealistically low AND converting to minutes gives a realistic rate
+                    if (calPerMin < 1.0 && calPerMinConverted >= 3 && calPerMinConverted <= 25) {
                         w['Duration (min)'] = (dur / 60).toFixed(1);
                         return;
                     }
+                }
+
+                // Method 3: Duration > 300 with no distance and no calories — almost certainly seconds
+                if (dur > 300 && dist === 0 && cal === 0) {
+                    w['Duration (min)'] = (dur / 60).toFixed(1);
                 }
             });
-            
+
+            // Zero out distance for non-distance workout types
+            const nonDistanceTypes = new Set([
+                'Traditional Strength Training', 'Functional Strength Training',
+                'Rowing', 'Stair Climbing', 'Elliptical', 'Indoor Cycling',
+                'Yoga', 'Core Training', 'Flexibility', 'Cooldown',
+                'High Intensity Interval Training'
+            ]);
+            rawData.forEach(w => {
+                const wType = w['Workout Type'] || '';
+                if (nonDistanceTypes.has(wType)) {
+                    w['Distance (km)'] = 0;
+                }
+            });
+
             // Deduplicate workouts client-side (date + type + similar duration)
             const seen = new Set();
             rawData = rawData.filter(w => {
@@ -709,7 +747,24 @@ const fetchSheet = async (name) => {
                 seen.add(key);
                 return true;
             });
-            
+
+            // Cross-date dedup: remove workouts with identical fingerprint on different dates
+            // (HAE re-sync can copy the same workout to an adjacent date)
+            const fingerprints = new Set();
+            rawData = rawData.filter(w => {
+                const dur = Math.round(parseFloat(w['Duration (min)']) || 0);
+                const cal = Math.round(parseFloat(w['Calories']) || 0);
+                const hr = Math.round(parseFloat(w['Avg HR']) || 0);
+                const dist = Math.round((parseFloat(w['Distance (km)']) || 0) * 10); // 1 decimal precision
+                const fp = `${w['Workout Type']}|${dur}|${cal}|${hr}|${dist}`;
+                if (fingerprints.has(fp)) {
+                    console.log(`[Workouts] Cross-date duplicate removed: ${w['Date']} ${w['Workout Type']} ${dur}min`);
+                    return false;
+                }
+                fingerprints.add(fp);
+                return true;
+            });
+
             console.log(`[Workouts] After cleanup: ${rawData.length} workouts`);
         }
         
@@ -733,7 +788,14 @@ const InsightEngine = {
         // Track which components have real data
         const hasHR = restingHR != null && restingHR > 0;
         const hasHRV = hrv != null && hrv > 0;
-        const hasSleep = sleep != null && sleep > 0.5;
+        // Sanitize sleep: HAE fragments can sum to 35+ hours in the sheet.
+        // Valid human sleep is 0.5-16 hours. Anything outside = bad data.
+        let cleanSleep = sleep;
+        if (cleanSleep != null && (cleanSleep > 16 || cleanSleep < 0.5)) {
+            console.log(`[Sleep] Discarding invalid sleep value: ${cleanSleep}h`);
+            cleanSleep = null;
+        }
+        const hasSleep = cleanSleep != null && cleanSleep > 0.5;
         const hasHRVBalance = hrvAvg14 > 0 && hrvBaseline60 > 0;
         
         // ═══════════════════════════════════════
@@ -785,8 +847,8 @@ const InsightEngine = {
         // ═══════════════════════════════════════
         let sleepScore = 0, sleepStatus = 'no data';
         if (hasSleep) {
-            sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
-            sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
+            sleepScore = cleanSleep >= 8 ? 25 : cleanSleep >= 7 ? 22 : cleanSleep >= 6 ? 16 : cleanSleep >= 5 ? 10 : 5;
+            sleepStatus = cleanSleep >= 7.5 ? 'optimal' : cleanSleep >= 6.5 ? 'good' : cleanSleep >= 5.5 ? 'fair' : 'poor';
         }
         
         // ═══════════════════════════════════════
@@ -843,7 +905,7 @@ const InsightEngine = {
             components: {
                 hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
                 hrv: { score: hrvScore, max: 30, value: hrv, avg7: hrvAvg7, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
-                sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus, hasSleep },
+                sleep: { score: sleepScore, max: 25, value: cleanSleep, status: sleepStatus, hasSleep },
                 load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
         };
@@ -1970,23 +2032,22 @@ function App() {
         const sortedDaily = [...daily].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
         
         // Find latest row with actual HR data (skip empty/null rows)
-        const findLatest = (field) => {
+        const findLatest = (field, maxValid) => {
             for (let i = sortedDaily.length - 1; i >= 0; i--) {
                 const val = parseFloat(sortedDaily[i][field]);
-                if (val > 0) return val;
+                if (val > 0 && (!maxValid || val <= maxValid)) return val;
             }
             return null;
         };
-        
+
         const restingHR = findLatest('Resting HR');
         const hrv = findLatest('HRV (ms)');
-        const sleep = findLatest('Sleep Duration (hr)');
+        const sleep = findLatest('Sleep Duration (hr)', 16); // skip values > 16h (bad data)
         const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
 
-        // Debug: log sleep values across recent dates
-        const recentSleep = sortedDaily.slice(-5).map(d => ({ date: d['Date'], sleep: d['Sleep Duration (hr)'] }));
-        console.log('[Sleep Debug]', { sleepFound: sleep, recentDays: recentSleep });
-        
+        // Sanitize sleep in this scope too (used in return values below)
+        const cleanSleep = (sleep != null && sleep >= 0.5 && sleep <= 16) ? sleep : null;
+
         // 7-day averages — use rows from the last 7 calendar days
         const recent7Daily = sortedDaily.filter(d => new Date(d['Date']) >= last7);
         // If no data in last 7 days, fall back to last 7 rows that have data
@@ -1999,7 +2060,7 @@ function App() {
         const hrAvg7 = math.mean(hrValues7.length > 0 ? hrValues7 : allHR.slice(-7));
         const hrvAvg7 = math.mean(hrvValues7.length > 0 ? hrvValues7 : allHRV.slice(-7));
         
-        console.log('[Readiness Debug]', { restingHR, hrv, sleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
+        console.log('[Readiness Debug]', { restingHR, hrv, sleep: cleanSleep, vo2max, hrAvg7, hrvAvg7 });
         
         // ═══ HRV Balance (Oura-style): 14-day weighted avg vs 60-day baseline ═══
         const last14 = daysAgo(14);
@@ -2109,22 +2170,37 @@ function App() {
             }
         });
 
+        // Data freshness check: compare last 3 days of steps to 14-day average
+        let dataWarning = null;
+        const last3Daily = sortedDaily.filter(d => new Date(d['Date']) >= daysAgo(3));
+        const last14Daily = sortedDaily.filter(d => new Date(d['Date']) >= daysAgo(14));
+        if (last14Daily.length >= 7) {
+            const steps14 = last14Daily.map(d => parseFloat(d['Steps']) || 0).filter(v => v > 0);
+            const stepsRecent = last3Daily.map(d => parseFloat(d['Steps']) || 0);
+            const avgSteps14 = steps14.length > 0 ? steps14.reduce((a, b) => a + b, 0) / steps14.length : 0;
+            const avgStepsRecent = stepsRecent.length > 0 ? stepsRecent.reduce((a, b) => a + b, 0) / stepsRecent.length : 0;
+            if (avgSteps14 > 1000 && avgStepsRecent < avgSteps14 * 0.2) {
+                dataWarning = 'Recent health data looks incomplete — check Health Auto Export sync';
+            }
+        }
+
         return {
             workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
             completedDays,
-            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
-            readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
+            dataWarning,
+            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: cleanSleep || 0, vo2max },
+            readinessInput: { restingHR, hrv, sleep: cleanSleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
-            raceInput: { 
-                twoKm: latestTests.twoKm?.time || 0, 
-                threshold: latestTests.threshold?.pace || 0, 
-                weeklyKm, 
+            raceInput: {
+                twoKm: latestTests.twoKm?.time || 0,
+                threshold: latestTests.threshold?.pace || 0,
+                weeklyKm,
                 paceDecay: tests.miniSim?.length > 0 ? parseFloat(tests.miniSim[tests.miniSim.length - 1].decay) : 0,
-                vo2max 
+                vo2max
             },
-            hyroxInput: { 
-                latestSim: tests.miniSim?.length > 0 ? tests.miniSim[tests.miniSim.length - 1] : null, 
-                simHistory: tests.miniSim || [] 
+            hyroxInput: {
+                latestSim: tests.miniSim?.length > 0 ? tests.miniSim[tests.miniSim.length - 1] : null,
+                simHistory: tests.miniSim || []
             },
             historyData: { vo2History, volHistory },
             latestTests
@@ -2142,6 +2218,7 @@ function App() {
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
     const completedDays = computedData?.completedDays || {};
+    const dataWarning = computedData?.dataWarning || null;
     
     // Today's session
     const todaySession = weekPlan.find(s => s.day === todayName) || weekPlan[0];
@@ -2168,6 +2245,16 @@ function App() {
                 </h1>
             </div>
             
+            {/* Data freshness warning */}
+            {dataWarning && (
+                <div className="px-5 mb-4 fade-up" style={{ }}>
+                    <div style={{ background: 'var(--orange-dim)', border: '1px solid rgba(255,159,10,0.2)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 16 }}>⚠</span>
+                        <p style={{ fontSize: 13, color: 'var(--orange)', lineHeight: 1.3 }}>{dataWarning}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Today's Session Card */}
             <div className="px-5 mb-4 fade-up delay-1">
                 <SessionCard session={todaySession} isToday={true} onClick={() => setModal({ type: 'session', data: todaySession })} />
