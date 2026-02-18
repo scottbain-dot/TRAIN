@@ -665,6 +665,19 @@ const fetchSheet = async (name) => {
             });
             const merged = Object.values(byDate);
             console.log(`[${name}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
+            // Sleep debug — log headers and any rows with sleep data
+            console.log(`[${name}] Column headers:`, headers.filter(h => h));
+            const sleepRows = merged.filter(r => r['Sleep Duration (hr)'] > 0);
+            console.log(`[${name}] Rows with Sleep Duration (hr) > 0:`, sleepRows.length, sleepRows.slice(-5));
+            if (sleepRows.length === 0) {
+                // Check for any column containing "sleep" (case-insensitive) in case of naming mismatch
+                const sleepCols = headers.filter(h => h && h.toLowerCase().includes('sleep'));
+                console.log(`[${name}] All sleep-related columns found:`, sleepCols);
+                if (sleepCols.length > 0) {
+                    const altSleepRows = merged.filter(r => sleepCols.some(c => parseFloat(r[c]) > 0));
+                    console.log(`[${name}] Rows with ANY sleep column > 0:`, altSleepRows.length, altSleepRows.slice(-3));
+                }
+            }
             return merged;
         }
         
