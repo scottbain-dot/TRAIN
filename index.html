@@ -746,7 +746,14 @@ const InsightEngine = {
         // Track which components have real data
         const hasHR = restingHR != null && restingHR > 0;
         const hasHRV = hrv != null && hrv > 0;
-        const hasSleep = sleep != null && sleep > 0.5;
+        // Sanitize sleep: HAE fragments can sum to 35+ hours in the sheet.
+        // Valid human sleep is 0.5-16 hours. Anything outside = bad data.
+        let cleanSleep = sleep;
+        if (cleanSleep != null && (cleanSleep > 16 || cleanSleep < 0.5)) {
+            console.log(`[Sleep] Discarding invalid sleep value: ${cleanSleep}h`);
+            cleanSleep = null;
+        }
+        const hasSleep = cleanSleep != null && cleanSleep > 0.5;
         const hasHRVBalance = hrvAvg14 > 0 && hrvBaseline60 > 0;
         
         // ═══════════════════════════════════════
@@ -798,8 +805,8 @@ const InsightEngine = {
         // ═══════════════════════════════════════
         let sleepScore = 0, sleepStatus = 'no data';
         if (hasSleep) {
-            sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
-            sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
+            sleepScore = cleanSleep >= 8 ? 25 : cleanSleep >= 7 ? 22 : cleanSleep >= 6 ? 16 : cleanSleep >= 5 ? 10 : 5;
+            sleepStatus = cleanSleep >= 7.5 ? 'optimal' : cleanSleep >= 6.5 ? 'good' : cleanSleep >= 5.5 ? 'fair' : 'poor';
         }
         
         // ═══════════════════════════════════════
@@ -856,7 +863,7 @@ const InsightEngine = {
             components: {
                 hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
                 hrv: { score: hrvScore, max: 30, value: hrv, avg7: hrvAvg7, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
-                sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus, hasSleep },
+                sleep: { score: sleepScore, max: 25, value: cleanSleep, status: sleepStatus, hasSleep },
                 load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
         };
@@ -1983,17 +1990,17 @@ function App() {
         const sortedDaily = [...daily].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
         
         // Find latest row with actual HR data (skip empty/null rows)
-        const findLatest = (field) => {
+        const findLatest = (field, maxValid) => {
             for (let i = sortedDaily.length - 1; i >= 0; i--) {
                 const val = parseFloat(sortedDaily[i][field]);
-                if (val > 0) return val;
+                if (val > 0 && (!maxValid || val <= maxValid)) return val;
             }
             return null;
         };
-        
+
         const restingHR = findLatest('Resting HR');
         const hrv = findLatest('HRV (ms)');
-        const sleep = findLatest('Sleep Duration (hr)');
+        const sleep = findLatest('Sleep Duration (hr)', 16); // skip values > 16h (bad data)
         const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
 
         // Debug: log sleep values across recent dates
@@ -2012,7 +2019,7 @@ function App() {
         const hrAvg7 = math.mean(hrValues7.length > 0 ? hrValues7 : allHR.slice(-7));
         const hrvAvg7 = math.mean(hrvValues7.length > 0 ? hrvValues7 : allHRV.slice(-7));
         
-        console.log('[Readiness Debug]', { restingHR, hrv, sleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
+        console.log('[Readiness Debug]', { restingHR, hrv, sleepRaw: sleep, sleepClean: cleanSleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
         
         // ═══ HRV Balance (Oura-style): 14-day weighted avg vs 60-day baseline ═══
         const last14 = daysAgo(14);
@@ -2125,8 +2132,8 @@ function App() {
         return {
             workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
             completedDays,
-            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
-            readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
+            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: cleanSleep || 0, vo2max },
+            readinessInput: { restingHR, hrv, sleep: cleanSleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
             raceInput: { 
                 twoKm: latestTests.twoKm?.time || 0, 
