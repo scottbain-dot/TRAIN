@@ -641,6 +641,7 @@ const fetchSheet = async (name) => {
         // Aggregate rows by date — Health Auto Export writes fragments across multiple rows
         if (name === CONFIG.sheets.daily) {
             const byDate = {};
+            const sleepCols = new Set(['Sleep Duration (hr)', 'Deep Sleep (hr)', 'REM Sleep (hr)']);
             rawData.forEach(row => {
                 const d = row['Date'];
                 if (!byDate[d]) byDate[d] = { Date: d };
@@ -648,10 +649,14 @@ const fetchSheet = async (name) => {
                     if (h && h !== 'Date') {
                         const val = parseFloat(row[h]);
                         if (!isNaN(val) && val > 0) {
-                            // For Steps and Calories, sum them; for everything else take latest non-null
                             if (h === 'Steps' || h === 'Active Calories') {
+                                // Sum accumulative metrics
                                 byDate[d][h] = (byDate[d][h] || 0) + val;
+                            } else if (sleepCols.has(h)) {
+                                // Sleep: take MAX value (HAE sends running fragments, highest = most complete)
+                                byDate[d][h] = Math.max(byDate[d][h] || 0, val);
                             } else {
+                                // Everything else: take latest non-null
                                 byDate[d][h] = val;
                             }
                         }
@@ -1977,6 +1982,10 @@ function App() {
         const hrv = findLatest('HRV (ms)');
         const sleep = findLatest('Sleep Duration (hr)');
         const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
+
+        // Debug: log sleep values across recent dates
+        const recentSleep = sortedDaily.slice(-5).map(d => ({ date: d['Date'], sleep: d['Sleep Duration (hr)'] }));
+        console.log('[Sleep Debug]', { sleepFound: sleep, recentDays: recentSleep });
         
         // 7-day averages — use rows from the last 7 calendar days
         const recent7Daily = sortedDaily.filter(d => new Date(d['Date']) >= last7);
