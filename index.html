@@ -592,7 +592,7 @@ const storage = {
 const fmt = {
     time: (s) => s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '—',
     pace: (s) => s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}/km` : '—',
-    duration: (m) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.round(m)}min`,
+    duration: (m) => m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}min`,
     decimal: (n, d = 1) => n != null ? n.toFixed(d) : '—',
     percent: (n) => n != null ? `${Math.round(n)}%` : '—'
 };
@@ -624,7 +624,7 @@ const fetchSheet = async (name) => {
         const json = JSON.parse(txt.substring(47).slice(0, -2));
         const headers = json.table.cols.map(c => c.label || '');
         
-        const rawData = json.table.rows?.map(row => {
+        let rawData = json.table.rows?.map(row => {
             const obj = {};
             row.c?.forEach((cell, i) => {
                 if (headers[i]) {
@@ -823,7 +823,7 @@ const InsightEngine = {
             message: getMessage(total),
             components: {
                 hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
-                hrv: { score: hrvScore, max: 30, value: hrv, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
+                hrv: { score: hrvScore, max: 30, value: hrv, avg7: hrvAvg7, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
                 sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus },
                 load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
@@ -1255,9 +1255,9 @@ const ReadinessModal = ({ data, onClose }) => {
                         
                         <ContributorBar 
                             label="Heart Rate Variability"
-                            sublabel={components.hrv.baseline60 > 0 
+                            sublabel={components.hrv.baseline60 > 0
                                 ? `Balance: ${components.hrv.balance >= 0 ? '+' : ''}${components.hrv.balance?.toFixed(0)}% vs 60-day avg`
-                                : `7-day avg: ${hrvAvg7?.toFixed(0) || '—'} ms`}
+                                : `7-day avg: ${components.hrv.avg7?.toFixed(0) || '—'} ms`}
                             value={`${components.hrv.value?.toFixed(0) || '—'} ms`}
                             score={components.hrv.score}
                             maxScore={components.hrv.max}
@@ -1648,7 +1648,7 @@ const VolumeModal = ({ stats, targetVol, onClose }) => {
                                             </div>
                                             <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                                                 {dur > 0 && dist > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
-                                                {pace > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
+                                                {pace > 0 && pace < 600 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
                                                 {hr > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>❤️ {hr} bpm</span>}
                                             </div>
                                         </div>
@@ -1760,6 +1760,7 @@ function App() {
     const [daily, setDaily] = useState([]);
     const [tests, setTests] = useState(storage.get('tests', { twoKm: [], threshold: [], miniSim: [] }));
     const [historyRange, setHistoryRange] = useState('3M');
+    const [historyFilter, setHistoryFilter] = useState('All');
     const [loading, setLoading] = useState(true);
     const [planView, setPlanView] = useState('week'); // 'week' or 'phases'
     
@@ -2006,9 +2007,14 @@ function App() {
             return dur * (avgHR / maxHR);
         };
         
-        // Yesterday's TRIMP
-        const yesterday = daysAgo(1).toISOString().split('T')[0];
-        const yesterdayWorkouts = workouts.filter(w => w['Date'] === yesterday);
+        // Yesterday's TRIMP — compare using date objects to handle different date formats
+        const yesterdayDate = daysAgo(1);
+        const yesterdayWorkouts = workouts.filter(w => {
+            const d = new Date(w['Date']);
+            return d.getFullYear() === yesterdayDate.getFullYear()
+                && d.getMonth() === yesterdayDate.getMonth()
+                && d.getDate() === yesterdayDate.getDate();
+        });
         const trimpYesterday = yesterdayWorkouts.reduce((s, w) => s + calcTrimp(w), 0);
         
         // 7-day rolling average TRIMP per day
@@ -2043,9 +2049,29 @@ function App() {
             twoKm: tests.twoKm?.length > 0 ? tests.twoKm[tests.twoKm.length - 1] : null,
             threshold: tests.threshold?.length > 0 ? tests.threshold[tests.threshold.length - 1] : null
         };
-        
+
+        // Track which days this week (Mon-Sun) have completed workouts
+        // Calculate Monday of current week
+        const todayDay = today.getDay(); // 0=Sun
+        const mondayOffset = todayDay === 0 ? -6 : 1 - todayDay;
+        const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset);
+        const completedDays = {};
+        workouts.forEach(w => {
+            const d = new Date(w['Date']);
+            const diff = Math.floor((d - monday) / 86400000);
+            if (diff >= 0 && diff <= 6) {
+                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+                const dayName = dayNames[diff];
+                if (dayName) {
+                    if (!completedDays[dayName]) completedDays[dayName] = [];
+                    completedDays[dayName].push(w);
+                }
+            }
+        });
+
         return {
             workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
+            completedDays,
             latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
             readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
@@ -2075,6 +2101,7 @@ function App() {
     const latestDaily = computedData?.latestDaily || {};
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
+    const completedDays = computedData?.completedDays || {};
     
     // Today's session
     const todaySession = weekPlan.find(s => s.day === todayName) || weekPlan[0];
@@ -2247,30 +2274,54 @@ function App() {
                         <p className="label">THIS WEEK</p>
                     </div>
                     <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {weekPlan.map((session, i) => (
-                            <div key={i} className="card" style={{ 
-                                padding: 16, cursor: 'pointer',
-                                border: session.day === todayName ? '1px solid var(--blue)' : '1px solid var(--border)'
-                            }} onClick={() => setModal({ type: 'session', data: session })}>
-                                <div className="flex flex-between flex-center">
-                                    <div>
-                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                                            {session.day}{session.day === todayName && ' · Today'}
-                                        </p>
-                                        <p style={{ fontWeight: 500 }}>{session.type}</p>
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        {session.duration > 0 && (
-                                            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{session.duration}min</span>
-                                        )}
-                                        <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`} 
-                                            style={{ padding: '4px 10px', fontSize: 11, marginBottom: 0 }}>
-                                            {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : 'REST'}
-                                        </span>
+                        {weekPlan.map((session, i) => {
+                            const dayWorkouts = completedDays[session.day] || [];
+                            const isCompleted = dayWorkouts.length > 0;
+                            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                            const isPast = dayNames.indexOf(session.day) < today.getDay() || (today.getDay() === 0 && session.day !== 'Sunday');
+                            const isToday = session.day === todayName;
+
+                            return (
+                                <div key={i} className="card" style={{
+                                    padding: 16, cursor: 'pointer',
+                                    border: isToday ? '1px solid var(--blue)' : isCompleted ? '1px solid rgba(48,209,88,0.3)' : '1px solid var(--border)',
+                                    opacity: isPast && !isCompleted && !isToday ? 0.6 : 1
+                                }} onClick={() => setModal({ type: 'session', data: session })}>
+                                    <div className="flex flex-between flex-center">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {isCompleted && (
+                                                <div style={{
+                                                    width: 22, height: 22, borderRadius: '50%',
+                                                    background: 'var(--green)', display: 'flex',
+                                                    alignItems: 'center', justifyContent: 'center',
+                                                    fontSize: 13, fontWeight: 700, flexShrink: 0
+                                                }}>✓</div>
+                                            )}
+                                            <div>
+                                                <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                                                    {session.day}{isToday && ' · Today'}
+                                                    {isCompleted && dayWorkouts.map(w => {
+                                                        const d = parseFloat(w['Distance (km)']) || 0;
+                                                        const dur = parseFloat(w['Duration (min)']) || 0;
+                                                        return d > 0 ? ` · ${d.toFixed(1)}km` : dur > 0 ? ` · ${fmt.duration(dur)}` : '';
+                                                    }).join('')}
+                                                </p>
+                                                <p style={{ fontWeight: 500 }}>{session.type}</p>
+                                            </div>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                            {session.duration > 0 && (
+                                                <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{session.duration}min</span>
+                                            )}
+                                            <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`}
+                                                style={{ padding: '4px 10px', fontSize: 11, marginBottom: 0 }}>
+                                                {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : 'REST'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     
                     {/* Key Principles */}
@@ -2346,30 +2397,44 @@ function App() {
         const rangeMap = { '3M': 90, '6M': 180, 'Y': 365, 'All': 9999 };
         const days = rangeMap[historyRange] || 180;
         const cutoff = daysAgo(days);
-        
+
         const filteredWorkouts = workouts.filter(w => new Date(w['Date']) >= cutoff);
         const filteredDaily = daily.filter(d => new Date(d['Date']) >= cutoff);
-        
+
         const totalKm = filteredWorkouts.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
         const totalMins = filteredWorkouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
         const sessions = filteredWorkouts.length;
-        
+
         const vo2Values = filteredDaily.map(d => parseFloat(d['VO2 Max'])).filter(Boolean);
         const vo2Start = vo2Values[0];
         const vo2End = vo2Values[vo2Values.length - 1];
         const vo2Change = vo2Start && vo2End ? vo2End - vo2Start : 0;
-        
+
+        // Type-filtered workouts for the log
+        const typeFilteredWorkouts = historyFilter === 'All'
+            ? filteredWorkouts
+            : historyFilter === 'Running'
+                ? filteredWorkouts.filter(w => (w['Workout Type'] || '').toLowerCase().includes('running'))
+                : historyFilter === 'Strength'
+                    ? filteredWorkouts.filter(w => (w['Workout Type'] || '').toLowerCase().includes('strength'))
+                    : filteredWorkouts.filter(w => {
+                        const t = (w['Workout Type'] || '').toLowerCase();
+                        return !t.includes('running') && !t.includes('strength');
+                    });
+
+        const sortedFiltered = [...typeFilteredWorkouts].sort((a, b) => new Date(b['Date']) - new Date(a['Date']));
+
         return (
             <div className="container hide-scrollbar">
                 <div className="px-5 py-4">
                     <h1 style={{ fontSize: 28, fontWeight: 600 }}>History</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Your training journey</p>
                 </div>
-                
+
                 <div className="px-5 mb-4">
                     <TimeToggle value={historyRange} onChange={setHistoryRange} options={['3M', '6M', 'Y', 'All']} />
                 </div>
-                
+
                 {/* Summary Stats */}
                 <div className="px-5 mb-4 fade-up">
                     <p className="label" style={{ marginBottom: 12 }}>PERIOD SUMMARY</p>
@@ -2377,11 +2442,11 @@ function App() {
                         <StatBox label="Total Volume" value={totalKm.toFixed(0)} unit=" km" />
                         <StatBox label="Training Time" value={Math.round(totalMins / 60)} unit=" hrs" />
                         <StatBox label="Sessions" value={sessions} />
-                        <StatBox label="VO₂ Change" value={vo2Change > 0 ? `+${vo2Change.toFixed(1)}` : vo2Change.toFixed(1)} 
+                        <StatBox label="VO₂ Change" value={vo2Change > 0 ? `+${vo2Change.toFixed(1)}` : vo2Change.toFixed(1)}
                             positive={vo2Change > 0} />
                     </div>
                 </div>
-                
+
                 {/* VO2max Chart */}
                 <div className="px-5 mb-4 fade-up delay-1">
                     <div className="card" style={{ padding: 20 }}>
@@ -2396,7 +2461,7 @@ function App() {
                         <LineChart data={vo2Values} color="var(--green)" height={180} />
                     </div>
                 </div>
-                
+
                 {/* Weekly Volume Chart */}
                 <div className="px-5 mb-4 fade-up delay-2">
                     <div className="card" style={{ padding: 20 }}>
@@ -2404,29 +2469,91 @@ function App() {
                         <BarChart data={historyData.volHistory} color="var(--blue)" height={100} />
                     </div>
                 </div>
-                
+
+                {/* Workout Log with Type Filter */}
+                <div className="px-5 mb-4 fade-up delay-3">
+                    <p className="label" style={{ marginBottom: 12 }}>WORKOUT LOG</p>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }} className="hide-scrollbar">
+                        {['All', 'Running', 'Strength', 'Other'].map(f => (
+                            <button key={f} onClick={() => setHistoryFilter(f)} style={{
+                                padding: '8px 16px', borderRadius: 20, border: 'none',
+                                background: historyFilter === f ? 'var(--blue)' : 'var(--card-elevated)',
+                                color: historyFilter === f ? 'white' : 'var(--text-secondary)',
+                                fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap'
+                            }}>{f}</button>
+                        ))}
+                    </div>
+
+                    {sortedFiltered.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-tertiary)' }}>
+                            <p>No {historyFilter !== 'All' ? historyFilter.toLowerCase() + ' ' : ''}workouts in this period</p>
+                        </div>
+                    ) : (
+                        sortedFiltered.slice(0, 50).map((w, i) => {
+                            const dist = parseFloat(w['Distance (km)']) || 0;
+                            const dur = parseFloat(w['Duration (min)']) || 0;
+                            const hr = parseFloat(w['Avg HR']) || 0;
+                            const pace = parseFloat(w['Avg Pace (sec/km)']) || 0;
+                            const wDate = new Date(w['Date']);
+                            const dateLabel = wDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+                            return (
+                                <div key={i} style={{
+                                    padding: '14px 16px',
+                                    background: 'var(--card)',
+                                    border: '1px solid var(--border)',
+                                    borderRadius: 14,
+                                    marginBottom: 8
+                                }}>
+                                    <div className="flex flex-between flex-center">
+                                        <div>
+                                            <p style={{ fontWeight: 500, fontSize: 15 }}>{w['Workout Type'] || 'Workout'}</p>
+                                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{dateLabel}</p>
+                                        </div>
+                                        <div style={{ textAlign: 'right' }}>
+                                            <p style={{ fontWeight: 600, fontSize: 15, color: dist > 0 ? 'var(--blue)' : 'var(--cyan)' }}>
+                                                {dist > 0 ? `${dist.toFixed(1)} km` : fmt.duration(dur)}
+                                            </p>
+                                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 2 }}>
+                                                {dist > 0 && dur > 0 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
+                                                {pace > 0 && pace < 600 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
+                                                {hr > 0 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(hr)} bpm</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    )}
+                    {sortedFiltered.length > 50 && (
+                        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-tertiary)', marginTop: 12 }}>
+                            Showing 50 of {sortedFiltered.length} workouts
+                        </p>
+                    )}
+                </div>
+
                 {/* Insights */}
                 {totalKm > 100 && (
-                    <div className="px-5 fade-up delay-3">
+                    <div className="px-5 fade-up delay-4">
                         <p className="label" style={{ marginBottom: 12 }}>KEY INSIGHTS</p>
-                        
+
                         {vo2Change > 1 && (
-                            <InsightBox 
-                                title="VO₂max is growing" 
+                            <InsightBox
+                                title="VO₂max is growing"
                                 text={`+${vo2Change.toFixed(1)} increase. Your aerobic base is developing well.`}
                                 color="green"
                             />
                         )}
-                        
+
                         {totalKm / (days / 7) >= 30 ? (
-                            <InsightBox 
-                                title="Strong volume consistency" 
+                            <InsightBox
+                                title="Strong volume consistency"
                                 text={`Averaging ${(totalKm / (days / 7)).toFixed(0)}km/week. This consistency drives adaptation.`}
                                 color="green"
                             />
                         ) : (
-                            <InsightBox 
-                                title="Volume opportunity" 
+                            <InsightBox
+                                title="Volume opportunity"
                                 text={`Averaging ${(totalKm / (days / 7)).toFixed(0)}km/week. Building to 40-50km would accelerate progress.`}
                                 color="orange"
                             />
@@ -2490,7 +2617,7 @@ function App() {
             {modal?.type === 'hyroxReady' && (
                 <HyroxReadyModal 
                     data={hyroxReady}
-                    history={tests.miniSim}
+                    history={tests.miniSim || []}
                     onClose={() => setModal(null)}
                     onLogTest={(t) => { setModal(null); setTestModal(t); }}
                 />
