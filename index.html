@@ -776,8 +776,9 @@ const InsightEngine = {
         
         // ═══════════════════════════════════════
         // Sleep Component (0-25)
+        // No phantom credit: if no data, score = 0 and excluded from max
         // ═══════════════════════════════════════
-        let sleepScore = 12, sleepStatus = 'no data';
+        let sleepScore = 0, sleepStatus = 'no data';
         if (hasSleep) {
             sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
             sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
@@ -808,8 +809,20 @@ const InsightEngine = {
             loadScore = 18; loadStatus = 'rest day';
         }
         
-        const total = hrScore + hrvScore + sleepScore + loadScore;
-        
+        // Score with dynamic max: exclude missing components rather than giving phantom credit
+        const rawTotal = hrScore + hrvScore + sleepScore + loadScore;
+        const maxAvailable = (hasHR && hrAvg7 > 0 ? 25 : 0)
+            + (hasHRV || hasHRVBalance ? 30 : 0)
+            + (hasSleep ? 25 : 0)
+            + 20; // load always has a calculation path
+        const total = maxAvailable > 0 ? Math.round((rawTotal / maxAvailable) * 100) : 50;
+
+        // Track what data is missing for UI warnings
+        const missingData = [];
+        if (!hasSleep) missingData.push('sleep');
+        if (!hasHR || hrAvg7 <= 0) missingData.push('heart rate');
+        if (!hasHRV && !hasHRVBalance) missingData.push('HRV');
+
         const getMessage = (score) => {
             if (score >= 85) return { text: "You're primed. Great day for intensity.", status: 'peak' };
             if (score >= 70) return { text: "Good recovery. Train as planned.", status: 'good' };
@@ -817,14 +830,15 @@ const InsightEngine = {
             if (score >= 40) return { text: "Recovery incomplete. Consider going easy.", status: 'low' };
             return { text: "Rest recommended. Your body needs recovery.", status: 'rest' };
         };
-        
+
         return {
             score: total,
             message: getMessage(total),
+            missingData,
             components: {
                 hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
                 hrv: { score: hrvScore, max: 30, value: hrv, avg7: hrvAvg7, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
-                sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus },
+                sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus, hasSleep },
                 load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
         };
@@ -1161,7 +1175,7 @@ const ContributorBar = ({ label, sublabel, value, max, score, maxScore, color = 
                 <div style={{ textAlign: 'right' }}>
                     <p className="data-value">{value}</p>
                     {status && (
-                        <span className={`trend trend-${status === 'optimal' || status === 'strong' || status === 'good' || status === 'light' ? 'up' : status === 'normal' ? 'stable' : 'down'}`} 
+                        <span className={`trend trend-${status === 'optimal' || status === 'strong' || status === 'good' || status === 'light' ? 'up' : status === 'normal' || status === 'rest day' ? 'stable' : status === 'unavailable' || status === 'no data' ? 'neutral' : 'down'}`}
                             style={{ fontSize: 11, padding: '2px 8px', marginTop: 4 }}>
                             {status}
                         </span>
@@ -1220,9 +1234,10 @@ const InsightBox = ({ title, text, color = 'blue' }) => (
 
 // Readiness Detail Modal
 const ReadinessModal = ({ data, onClose }) => {
-    const { score, message, components } = data;
+    const { score, message, components, missingData = [] } = data;
     const statusColor = score >= 70 ? 'var(--green)' : score >= 55 ? 'var(--yellow)' : 'var(--orange)';
-    
+    const hasMissingData = missingData.length > 0;
+
     return (
         <div className="modal-overlay open" onClick={onClose}>
             <div className="modal-sheet hide-scrollbar" onClick={e => e.stopPropagation()}>
@@ -1235,15 +1250,20 @@ const ReadinessModal = ({ data, onClose }) => {
                         <div>
                             <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 4, textTransform: 'capitalize' }}>{message.status}</p>
                             <p className="insight">{message.text}</p>
+                            {hasMissingData && (
+                                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
+                                    Based on available data ({4 - missingData.length}/4 sources)
+                                </p>
+                            )}
                         </div>
                     </div>
                 </div>
-                
+
                 <div className="modal-body">
                     <div className="modal-section">
                         <p className="label" style={{ marginBottom: 16 }}>CONTRIBUTING FACTORS</p>
-                        
-                        <ContributorBar 
+
+                        <ContributorBar
                             label="Resting Heart Rate"
                             sublabel={`7-day avg: ${components.hr.avg?.toFixed(0) || '—'} bpm`}
                             value={`${components.hr.value?.toFixed(0) || '—'} bpm`}
@@ -1252,8 +1272,8 @@ const ReadinessModal = ({ data, onClose }) => {
                             color={components.hr.status === 'optimal' || components.hr.status === 'normal' ? 'var(--green)' : 'var(--orange)'}
                             status={components.hr.status}
                         />
-                        
-                        <ContributorBar 
+
+                        <ContributorBar
                             label="Heart Rate Variability"
                             sublabel={components.hrv.baseline60 > 0
                                 ? `Balance: ${components.hrv.balance >= 0 ? '+' : ''}${components.hrv.balance?.toFixed(0)}% vs 60-day avg`
@@ -1264,20 +1284,23 @@ const ReadinessModal = ({ data, onClose }) => {
                             color={components.hrv.status === 'strong' || components.hrv.status === 'normal' ? 'var(--green)' : components.hrv.status === 'declining' || components.hrv.status === 'below avg' ? 'var(--yellow)' : 'var(--orange)'}
                             status={components.hrv.status}
                         />
-                        
-                        <ContributorBar 
+
+                        {/* Sleep: grey bar + "unavailable" when no data, colored bar when data exists */}
+                        <ContributorBar
                             label="Sleep"
-                            sublabel="Last night"
-                            value={components.sleep.value > 0.5 ? `${components.sleep.value.toFixed(1)}h` : '—'}
-                            score={components.sleep.score}
+                            sublabel={components.sleep.hasSleep ? 'Last night' : 'Data unavailable — check Health Auto Export'}
+                            value={components.sleep.hasSleep ? `${components.sleep.value.toFixed(1)}h` : '—'}
+                            score={components.sleep.hasSleep ? components.sleep.score : 0}
                             maxScore={components.sleep.max}
-                            color={components.sleep.status === 'optimal' || components.sleep.status === 'good' ? 'var(--green)' : components.sleep.status === 'fair' ? 'var(--yellow)' : 'var(--orange)'}
-                            status={components.sleep.status}
+                            color={!components.sleep.hasSleep ? 'rgba(255,255,255,0.15)'
+                                : components.sleep.status === 'optimal' || components.sleep.status === 'good' ? 'var(--green)'
+                                : components.sleep.status === 'fair' ? 'var(--yellow)' : 'var(--orange)'}
+                            status={components.sleep.hasSleep ? components.sleep.status : 'unavailable'}
                         />
-                        
-                        <ContributorBar 
+
+                        <ContributorBar
                             label="Training Load"
-                            sublabel={components.load.trimp > 0 
+                            sublabel={components.load.trimp > 0
                                 ? `TRIMP: ${components.load.trimp.toFixed(0)} vs avg ${components.load.avg.toFixed(0)}/day`
                                 : 'Yesterday vs 7-day average'}
                             value={components.load.status === 'rest day' ? 'Rest' : `${Math.round(components.load.ratio * 100)}%`}
@@ -1287,8 +1310,16 @@ const ReadinessModal = ({ data, onClose }) => {
                             status={components.load.status}
                         />
                     </div>
-                    
-                    <InsightBox 
+
+                    {hasMissingData && (
+                        <InsightBox
+                            title="⚠️ Limited data"
+                            text={`${missingData.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')} data not available. Score is calculated from ${4 - missingData.length} of 4 data sources. ${missingData.includes('sleep') ? 'Check Health Auto Export sleep settings to improve accuracy.' : ''}`}
+                            color="orange"
+                        />
+                    )}
+
+                    <InsightBox
                         title="💡 What this means"
                         text={message.text}
                         color={score >= 70 ? 'green' : score >= 55 ? 'orange' : 'red'}
@@ -2092,7 +2123,7 @@ function App() {
     }, [workouts, daily, tests, loading]);
     
     // Compute insight scores
-    const readiness = computedData ? InsightEngine.readiness(computedData.readinessInput) : { score: 0, message: { text: 'Loading...', status: 'loading' }, components: { hr: {}, hrv: {}, sleep: {}, load: {} } };
+    const readiness = computedData ? InsightEngine.readiness(computedData.readinessInput) : { score: 0, message: { text: 'Loading...', status: 'loading' }, missingData: [], components: { hr: {}, hrv: {}, sleep: {}, load: {} } };
     const aerobic = computedData ? InsightEngine.aerobic(computedData.aerobicInput) : { score: 0, vo2max: 0, trend: 'stable', vo2Trend: 0 };
     const racePrediction = computedData ? InsightEngine.racePrediction(computedData.raceInput) : { predicted: 0, formatted: '—', gap: 0, confidence: 'low', breakdown: {}, insight: { title: '', text: '', color: 'blue' } };
     const hyroxReady = computedData ? InsightEngine.hyroxReady(computedData.hyroxInput) : { score: null, hasSim: false, insight: { title: '', text: '', color: 'blue' } };
