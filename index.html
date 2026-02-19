@@ -560,6 +560,86 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+
+        /* Manual Entry Form */
+        .entry-form { display: flex; flex-direction: column; gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+        }
+        .form-input, .form-select {
+            background: var(--card-elevated);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            outline: none;
+            transition: border-color 0.2s;
+            -webkit-appearance: none;
+        }
+        .form-input:focus, .form-select:focus {
+            border-color: var(--blue);
+        }
+        .form-input::placeholder { color: var(--text-tertiary); }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .form-btn {
+            background: var(--blue);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            padding: 14px;
+            font-family: 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-top: 8px;
+        }
+        .form-btn:active { opacity: 0.7; }
+        .form-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .form-btn-secondary {
+            background: var(--card-elevated);
+            border: 1px solid var(--border);
+        }
+        .form-toggle {
+            display: flex;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+        }
+        .form-toggle button {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .form-toggle button.active {
+            background: var(--blue);
+            color: #fff;
+        }
+        .form-status {
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: 500;
+            text-align: center;
+        }
+        .form-status.success { background: var(--green-dim); color: var(--green); }
+        .form-status.error { background: var(--red-dim); color: var(--red); }
     </style>
 </head>
 <body>
@@ -2692,6 +2772,200 @@ function App() {
     };
     
     // ============================================
+    // ENTRY TAB — Manual Data Entry
+    // ============================================
+    const [entryMode, setEntryMode] = useState('metrics');
+    const [entryStatus, setEntryStatus] = useState(null);
+    const [entrySubmitting, setEntrySubmitting] = useState(false);
+
+    const APPS_SCRIPT_URL = storage.get('appsScriptUrl', '');
+
+    const [metricsForm, setMetricsForm] = useState({
+        date: new Date().toISOString().split('T')[0],
+        restingHR: '', hrv: '', vo2max: '',
+        sleepDuration: '', deepSleep: '', remSleep: '',
+        steps: '', calories: ''
+    });
+    const [workoutForm, setWorkoutForm] = useState({
+        date: new Date().toISOString().split('T')[0],
+        workout: 'Running', duration: '', distance: '',
+        avgHR: '', maxHR: '', calories: ''
+    });
+
+    const handleEntrySubmit = async () => {
+        const url = APPS_SCRIPT_URL;
+        if (!url) {
+            setEntryStatus({ type: 'error', msg: 'Set your Apps Script URL below first' });
+            return;
+        }
+        setEntrySubmitting(true);
+        setEntryStatus(null);
+        try {
+            const params = new URLSearchParams();
+            if (entryMode === 'metrics') {
+                params.set('type', 'metrics');
+                Object.entries(metricsForm).forEach(([k, v]) => { if (v) params.set(k, v); });
+            } else {
+                params.set('type', 'workout');
+                Object.entries(workoutForm).forEach(([k, v]) => { if (v) params.set(k, v); });
+            }
+            const res = await fetch(url + '?' + params.toString(), { mode: 'no-cors' });
+            // no-cors means we can't read the response, but the request goes through
+            setEntryStatus({ type: 'success', msg: (entryMode === 'metrics' ? 'Daily metrics' : 'Workout') + ' submitted!' });
+        } catch (err) {
+            setEntryStatus({ type: 'error', msg: 'Failed: ' + err.message });
+        }
+        setEntrySubmitting(false);
+    };
+
+    const renderEntry = () => (
+        <div className="container hide-scrollbar">
+            <div className="px-5 py-4 fade-up">
+                <h1 style={{ fontSize: 28, fontWeight: 600, marginBottom: 4 }}>Manual Entry</h1>
+                <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
+                    Backup data entry when Health Auto Export isn't syncing
+                </p>
+            </div>
+
+            <div className="px-5 fade-up delay-1">
+                <div className="form-toggle mb-4">
+                    <button className={entryMode === 'metrics' ? 'active' : ''} onClick={() => setEntryMode('metrics')}>Daily Metrics</button>
+                    <button className={entryMode === 'workout' ? 'active' : ''} onClick={() => setEntryMode('workout')}>Workout</button>
+                </div>
+
+                {entryMode === 'metrics' ? (
+                    <div className="entry-form">
+                        <div className="form-group">
+                            <label>Date</label>
+                            <input type="date" className="form-input" value={metricsForm.date}
+                                onChange={e => setMetricsForm(f => ({...f, date: e.target.value}))} />
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Resting HR (bpm)</label>
+                                <input type="number" className="form-input" placeholder="55" value={metricsForm.restingHR}
+                                    onChange={e => setMetricsForm(f => ({...f, restingHR: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>HRV (ms)</label>
+                                <input type="number" className="form-input" placeholder="42" value={metricsForm.hrv}
+                                    onChange={e => setMetricsForm(f => ({...f, hrv: e.target.value}))} />
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>VO2 Max</label>
+                            <input type="number" step="0.1" className="form-input" placeholder="43.5" value={metricsForm.vo2max}
+                                onChange={e => setMetricsForm(f => ({...f, vo2max: e.target.value}))} />
+                        </div>
+                        <div className="form-row-3">
+                            <div className="form-group">
+                                <label>Sleep (hr)</label>
+                                <input type="number" step="0.1" className="form-input" placeholder="7.5" value={metricsForm.sleepDuration}
+                                    onChange={e => setMetricsForm(f => ({...f, sleepDuration: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Deep (hr)</label>
+                                <input type="number" step="0.1" className="form-input" placeholder="1.5" value={metricsForm.deepSleep}
+                                    onChange={e => setMetricsForm(f => ({...f, deepSleep: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>REM (hr)</label>
+                                <input type="number" step="0.1" className="form-input" placeholder="1.8" value={metricsForm.remSleep}
+                                    onChange={e => setMetricsForm(f => ({...f, remSleep: e.target.value}))} />
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Steps</label>
+                                <input type="number" className="form-input" placeholder="8500" value={metricsForm.steps}
+                                    onChange={e => setMetricsForm(f => ({...f, steps: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Active Calories</label>
+                                <input type="number" className="form-input" placeholder="450" value={metricsForm.calories}
+                                    onChange={e => setMetricsForm(f => ({...f, calories: e.target.value}))} />
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="entry-form">
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Date</label>
+                                <input type="date" className="form-input" value={workoutForm.date}
+                                    onChange={e => setWorkoutForm(f => ({...f, date: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Type</label>
+                                <select className="form-select" value={workoutForm.workout}
+                                    onChange={e => setWorkoutForm(f => ({...f, workout: e.target.value}))}>
+                                    <option>Running</option>
+                                    <option>Traditional Strength Training</option>
+                                    <option>Functional Strength Training</option>
+                                    <option>HYROX Simulation</option>
+                                    <option>Cycling</option>
+                                    <option>Rowing</option>
+                                    <option>Walking</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Duration (min)</label>
+                                <input type="number" className="form-input" placeholder="45" value={workoutForm.duration}
+                                    onChange={e => setWorkoutForm(f => ({...f, duration: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Distance (km)</label>
+                                <input type="number" step="0.01" className="form-input" placeholder="8.5" value={workoutForm.distance}
+                                    onChange={e => setWorkoutForm(f => ({...f, distance: e.target.value}))} />
+                            </div>
+                        </div>
+                        <div className="form-row-3">
+                            <div className="form-group">
+                                <label>Avg HR</label>
+                                <input type="number" className="form-input" placeholder="145" value={workoutForm.avgHR}
+                                    onChange={e => setWorkoutForm(f => ({...f, avgHR: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Max HR</label>
+                                <input type="number" className="form-input" placeholder="172" value={workoutForm.maxHR}
+                                    onChange={e => setWorkoutForm(f => ({...f, maxHR: e.target.value}))} />
+                            </div>
+                            <div className="form-group">
+                                <label>Calories</label>
+                                <input type="number" className="form-input" placeholder="380" value={workoutForm.calories}
+                                    onChange={e => setWorkoutForm(f => ({...f, calories: e.target.value}))} />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {entryStatus && (
+                    <div className={`form-status mt-4 ${entryStatus.type}`}>{entryStatus.msg}</div>
+                )}
+
+                <button className="form-btn" onClick={handleEntrySubmit} disabled={entrySubmitting}>
+                    {entrySubmitting ? 'Submitting...' : `Save ${entryMode === 'metrics' ? 'Metrics' : 'Workout'}`}
+                </button>
+
+                {/* Apps Script URL config */}
+                <div className="mt-5" style={{ borderTop: '1px solid var(--border)', paddingTop: 20 }}>
+                    <p className="label" style={{ marginBottom: 8 }}>APPS SCRIPT URL</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+                        Paste your Google Apps Script web app URL. Saved in browser storage.
+                    </p>
+                    <input type="url" className="form-input" style={{ width: '100%', fontSize: 13 }}
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        defaultValue={APPS_SCRIPT_URL}
+                        onBlur={e => storage.set('appsScriptUrl', e.target.value.trim())}
+                    />
+                </div>
+            </div>
+        </div>
+    );
+
+    // ============================================
     // RENDER
     // ============================================
     return (
@@ -2699,6 +2973,7 @@ function App() {
             {tab === 'home' && renderHome()}
             {tab === 'plan' && renderPlan()}
             {tab === 'history' && renderHistory()}
+            {tab === 'entry' && renderEntry()}
             
             {/* Navigation */}
             <nav className="nav">
@@ -2723,6 +2998,13 @@ function App() {
                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
                     </svg>
                     <span>History</span>
+                </button>
+                <button className={`nav-item ${tab === 'entry' ? 'active' : ''}`} onClick={() => setTab('entry')}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <span>Entry</span>
                 </button>
             </nav>
             

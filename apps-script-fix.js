@@ -68,10 +68,177 @@ function doPost(e) {
   }
 }
 
+// ============================================
+// doGet — MANUAL DATA ENTRY VIA URL PARAMETERS
+// ============================================
+/**
+ * Accepts URL parameters and writes one row to DailyMetrics or Workouts.
+ *
+ * DailyMetrics params:
+ *   ?type=metrics&date=2026-02-19&restingHR=55&hrv=42&vo2max=44
+ *   &sleepDuration=7.2&deepSleep=1.5&remSleep=1.8&steps=8500&calories=450
+ *
+ * Workouts params:
+ *   ?type=workout&date=2026-02-19&workout=Running&duration=45&distance=8.5
+ *   &avgHR=145&maxHR=172&calories=380
+ *
+ * Health check (no params or type=status):
+ *   Returns endpoint status JSON
+ */
 function doGet(e) {
+  try {
+    const params = e && e.parameter ? e.parameter : {};
+    const entryType = (params.type || '').toLowerCase();
+
+    // Health check — no type or type=status
+    if (!entryType || entryType === 'status') {
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'ok',
+        message: 'HYROX ENGINE endpoint v4 running',
+        timestamp: new Date().toISOString(),
+        usage: {
+          metrics: '?type=metrics&date=YYYY-MM-DD&restingHR=&hrv=&vo2max=&sleepDuration=&deepSleep=&remSleep=&steps=&calories=',
+          workout: '?type=workout&date=YYYY-MM-DD&workout=Running&duration=&distance=&avgHR=&maxHR=&calories='
+        }
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+
+    // ── DAILY METRICS ──
+    if (entryType === 'metrics') {
+      const date = params.date;
+      if (!date) {
+        return jsonResponse('error', 'Missing required parameter: date');
+      }
+
+      let ws = spreadsheet.getSheetByName(METRICS_SHEET);
+      if (!ws) {
+        ws = spreadsheet.insertSheet(METRICS_SHEET);
+        ws.getRange(1, 1, 1, 11).setValues([[
+          'Date', 'Resting HR', 'HRV (ms)', 'VO2 Max',
+          'Sleep Duration (hr)', 'Deep Sleep (hr)', 'REM Sleep (hr)',
+          'Walking HR Avg', 'Steps', 'Active Calories', 'Weight (kg)'
+        ]]);
+        ws.getRange(1, 1, 1, 11).setFontWeight('bold');
+      }
+
+      // Check if date already exists — update instead of duplicate
+      const existingData = ws.getDataRange().getValues();
+      let existingRow = -1;
+      for (let i = 1; i < existingData.length; i++) {
+        let dateKey = existingData[i][0];
+        if (dateKey instanceof Date) {
+          dateKey = dateKey.toISOString().split('T')[0];
+        } else {
+          dateKey = String(dateKey).substring(0, 10);
+        }
+        if (dateKey === date) {
+          existingRow = i + 1; // 1-indexed sheet row
+          break;
+        }
+      }
+
+      const row = [
+        date,
+        params.restingHR || '',
+        params.hrv || '',
+        params.vo2max || '',
+        params.sleepDuration || '',
+        params.deepSleep || '',
+        params.remSleep || '',
+        params.walkingHR || '',
+        params.steps || '',
+        params.calories || '',
+        params.weight || ''
+      ];
+
+      if (existingRow > 0) {
+        // Merge: keep existing values where new param is empty
+        const existingVals = ws.getRange(existingRow, 1, 1, 11).getValues()[0];
+        for (let i = 1; i < row.length; i++) {
+          if (row[i] === '' && existingVals[i] !== '') {
+            row[i] = existingVals[i];
+          }
+        }
+        ws.getRange(existingRow, 1, 1, 11).setValues([row]);
+        logSync(spreadsheet, 'doGet: Updated DailyMetrics for ' + date);
+      } else {
+        ws.appendRow(row);
+        logSync(spreadsheet, 'doGet: Appended DailyMetrics for ' + date);
+      }
+
+      return jsonResponse('success', 'Daily metrics saved for ' + date);
+    }
+
+    // ── WORKOUT ──
+    if (entryType === 'workout') {
+      const date = params.date;
+      const workoutType = params.workout || params.workoutType || 'Unknown';
+      if (!date) {
+        return jsonResponse('error', 'Missing required parameter: date');
+      }
+
+      let ws = spreadsheet.getSheetByName(WORKOUTS_SHEET);
+      if (!ws) {
+        ws = spreadsheet.insertSheet(WORKOUTS_SHEET);
+        ws.getRange(1, 1, 1, 12).setValues([[
+          'Date', 'Workout Type', 'Duration (min)', 'Distance (km)',
+          'Calories', 'Avg HR', 'Max HR', 'Avg Pace (sec/km)',
+          'Elevation Gain (m)', 'Start Time', 'End Time', 'Source'
+        ]]);
+        ws.getRange(1, 1, 1, 12).setFontWeight('bold');
+      }
+
+      const duration = params.duration || '';
+      const distance = params.distance || '';
+      let avgPace = '';
+      if (duration && distance) {
+        const dSec = parseFloat(duration) * 60;
+        const dKm = parseFloat(distance);
+        if (dSec > 0 && dKm > 0) {
+          avgPace = Math.round(dSec / dKm);
+        }
+      }
+
+      const row = [
+        date,
+        workoutType,
+        duration,
+        distance,
+        params.calories || '',
+        params.avgHR || '',
+        params.maxHR || '',
+        avgPace,
+        params.elevation || '',
+        params.startTime || '',
+        params.endTime || '',
+        'Manual Entry'
+      ];
+
+      ws.appendRow(row);
+      logSync(spreadsheet, 'doGet: Appended workout (' + workoutType + ') for ' + date);
+      return jsonResponse('success', 'Workout (' + workoutType + ') saved for ' + date);
+    }
+
+    return jsonResponse('error', 'Unknown type: ' + entryType + '. Use type=metrics or type=workout');
+
+  } catch (error) {
+    try {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet();
+      logSync(sheet, 'doGet ERROR: ' + error.message);
+    } catch (e) {}
+    return jsonResponse('error', error.message);
+  }
+}
+
+/**
+ * Helper to return a JSON response from doGet/doPost
+ */
+function jsonResponse(status, message) {
   return ContentService.createTextOutput(JSON.stringify({
-    status: 'ok',
-    message: 'HYROX ENGINE endpoint v4 running',
+    status: status,
+    message: message,
     timestamp: new Date().toISOString()
   })).setMimeType(ContentService.MimeType.JSON);
 }
