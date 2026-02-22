@@ -575,7 +575,7 @@ const { useState, useEffect, useMemo } = React;
 // ============================================
 const CONFIG = {
     sheetId: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc',
-    sheets: { workouts: 'Workouts', daily: 'DailyMetrics' },
+    sheets: { workouts: 'Workouts', daily: 'DailyMetrics', weeklyPlan: 'WeeklyPlan', strengthA: 'StrengthA', strengthB: 'StrengthB' },
     targets: { vo2max: 48, twoKm: 465, threshold: 255, weeklyKm: 50, raceTime: 3900 },
     baselines: { vo2max: 43.5, twoKm: 540, threshold: 285 },
     profile: { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15', raceName: 'Malaga' }
@@ -592,7 +592,7 @@ const storage = {
 const fmt = {
     time: (s) => s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}` : '—',
     pace: (s) => s > 0 ? `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}/km` : '—',
-    duration: (m) => m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}min`,
+    duration: (m) => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.round(m)}min`,
     decimal: (n, d = 1) => n != null ? n.toFixed(d) : '—',
     percent: (n) => n != null ? `${Math.round(n)}%` : '—'
 };
@@ -624,7 +624,7 @@ const fetchSheet = async (name) => {
         const json = JSON.parse(txt.substring(47).slice(0, -2));
         const headers = json.table.cols.map(c => c.label || '');
         
-        let rawData = json.table.rows?.map(row => {
+        const rawData = json.table.rows?.map(row => {
             const obj = {};
             row.c?.forEach((cell, i) => {
                 if (headers[i]) {
@@ -641,18 +641,6 @@ const fetchSheet = async (name) => {
         // Aggregate rows by date — Health Auto Export writes fragments across multiple rows
         if (name === CONFIG.sheets.daily) {
             const byDate = {};
-            const sleepCols = new Set(['Sleep Duration (hr)', 'Deep Sleep (hr)', 'REM Sleep (hr)']);
-            // Bounds for physiological sanity — discard values outside these ranges
-            const metricBounds = {
-                'Resting HR': { min: 30, max: 120 },
-                'HRV (ms)': { min: 1, max: 250 },
-                'Walking HR': { min: 40, max: 200 },
-                'Walking HR Avg': { min: 40, max: 200 },
-                'VO2 Max': { min: 20, max: 80 },
-                'Sleep Duration (hr)': { min: 0, max: 16 },
-                'Deep Sleep (hr)': { min: 0, max: 8 },
-                'REM Sleep (hr)': { min: 0, max: 8 },
-            };
             rawData.forEach(row => {
                 const d = row['Date'];
                 if (!byDate[d]) byDate[d] = { Date: d };
@@ -660,29 +648,35 @@ const fetchSheet = async (name) => {
                     if (h && h !== 'Date') {
                         const val = parseFloat(row[h]);
                         if (!isNaN(val) && val > 0) {
-                            // Bounds check: discard physiologically impossible values
-                            const bounds = metricBounds[h];
-                            if (bounds && (val < bounds.min || val > bounds.max)) {
-                                console.log(`[DailyMetrics] Discarding ${h}=${val} on ${d} (bounds: ${bounds.min}-${bounds.max})`);
-                                return;
-                            }
+                            // For Steps and Calories, sum them; for everything else take latest non-null
                             if (h === 'Steps' || h === 'Active Calories') {
-                                // Sum accumulative metrics
                                 byDate[d][h] = (byDate[d][h] || 0) + val;
-                            } else if (sleepCols.has(h)) {
-                                // Sleep: take MAX value (HAE sends running fragments, highest = most complete)
-                                byDate[d][h] = Math.max(byDate[d][h] || 0, val);
                             } else {
-                                // Everything else: take latest non-null
                                 byDate[d][h] = val;
                             }
                         }
                     }
                 });
             });
+            
+            // Sanity-check sleep values
+            Object.values(byDate).forEach(row => {
+                const sleep = parseFloat(row['Sleep Duration (hr)']);
+                if (sleep > 16) {
+                    if (sleep > 24 && sleep <= 960) {
+                        row['Sleep Duration (hr)'] = (sleep / 60).toFixed(2); // was in minutes
+                    } else {
+                        row['Sleep Duration (hr)'] = ''; // garbage data, discard
+                    }
+                }
+                const deep = parseFloat(row['Deep Sleep (hr)']);
+                if (deep > 8) row['Deep Sleep (hr)'] = deep > 480 ? '' : (deep / 60).toFixed(2);
+                const rem = parseFloat(row['REM Sleep (hr)']);
+                if (rem > 8) row['REM Sleep (hr)'] = rem > 480 ? '' : (rem / 60).toFixed(2);
+            });
+            
             const merged = Object.values(byDate);
-            const sleepRows = merged.filter(r => r['Sleep Duration (hr)'] > 0);
-            console.log(`[${name}] ${rawData.length} raw rows → ${merged.length} days, ${sleepRows.length} with sleep data`);
+            console.log(`[${name}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
             return merged;
         }
         
@@ -693,51 +687,37 @@ const fetchSheet = async (name) => {
             rawData.forEach(w => {
                 let dur = parseFloat(w['Duration (min)']) || 0;
                 const dist = parseFloat(w['Distance (km)']) || 0;
-
+                
                 if (dur <= 0) return;
-
+                
                 // Method 1: If we have distance, check if pace is impossible (>30 min/km means dur is in seconds)
                 if (dist > 0) {
                     const paceMinPerKm = dur / dist;
                     if (paceMinPerKm > 30) {
-                        w['Duration (min)'] = (dur / 60).toFixed(1);
-                        return;
+                        dur = dur / 60;
+                        w['Duration (min)'] = dur.toFixed(1);
                     }
                 }
-
+                
                 // Method 2: No distance — use calorie rate as sanity check
-                // A reasonable workout burns 5-20 cal/min. If cal/min < 1, dur is likely in seconds
+                // A reasonable workout burns 5-20 cal/min. If cal/min < 1.5, dur is likely in seconds
                 const cal = parseFloat(w['Calories']) || 0;
-                if (cal > 0) {
+                if (cal > 0 && dur > 60) {
                     const calPerMin = cal / dur;
-                    const calPerMinConverted = cal / (dur / 60);
-                    // If current rate is unrealistically low AND converting to minutes gives a realistic rate
-                    if (calPerMin < 1.0 && calPerMinConverted >= 3 && calPerMinConverted <= 25) {
-                        w['Duration (min)'] = (dur / 60).toFixed(1);
-                        return;
+                    if (calPerMin < 1.5) {
+                        dur = dur / 60;
+                        w['Duration (min)'] = dur.toFixed(1);
                     }
                 }
-
-                // Method 3: Duration > 300 with no distance and no calories — almost certainly seconds
-                if (dur > 300 && dist === 0 && cal === 0) {
+                
+                // Method 3: Hard cap — no single workout should exceed 180 min (3 hours)
+                // If it does and wasn't caught above, it's almost certainly in seconds
+                dur = parseFloat(w['Duration (min)']) || 0;
+                if (dur > 180) {
                     w['Duration (min)'] = (dur / 60).toFixed(1);
                 }
             });
-
-            // Zero out distance for non-distance workout types
-            const nonDistanceTypes = new Set([
-                'Traditional Strength Training', 'Functional Strength Training',
-                'Rowing', 'Stair Climbing', 'Elliptical', 'Indoor Cycling',
-                'Yoga', 'Core Training', 'Flexibility', 'Cooldown',
-                'High Intensity Interval Training'
-            ]);
-            rawData.forEach(w => {
-                const wType = w['Workout Type'] || '';
-                if (nonDistanceTypes.has(wType)) {
-                    w['Distance (km)'] = 0;
-                }
-            });
-
+            
             // Deduplicate workouts client-side (date + type + similar duration)
             const seen = new Set();
             rawData = rawData.filter(w => {
@@ -747,24 +727,7 @@ const fetchSheet = async (name) => {
                 seen.add(key);
                 return true;
             });
-
-            // Cross-date dedup: remove workouts with identical fingerprint on different dates
-            // (HAE re-sync can copy the same workout to an adjacent date)
-            const fingerprints = new Set();
-            rawData = rawData.filter(w => {
-                const dur = Math.round(parseFloat(w['Duration (min)']) || 0);
-                const cal = Math.round(parseFloat(w['Calories']) || 0);
-                const hr = Math.round(parseFloat(w['Avg HR']) || 0);
-                const dist = Math.round((parseFloat(w['Distance (km)']) || 0) * 10); // 1 decimal precision
-                const fp = `${w['Workout Type']}|${dur}|${cal}|${hr}|${dist}`;
-                if (fingerprints.has(fp)) {
-                    console.log(`[Workouts] Cross-date duplicate removed: ${w['Date']} ${w['Workout Type']} ${dur}min`);
-                    return false;
-                }
-                fingerprints.add(fp);
-                return true;
-            });
-
+            
             console.log(`[Workouts] After cleanup: ${rawData.length} workouts`);
         }
         
@@ -788,14 +751,7 @@ const InsightEngine = {
         // Track which components have real data
         const hasHR = restingHR != null && restingHR > 0;
         const hasHRV = hrv != null && hrv > 0;
-        // Sanitize sleep: HAE fragments can sum to 35+ hours in the sheet.
-        // Valid human sleep is 0.5-16 hours. Anything outside = bad data.
-        let cleanSleep = sleep;
-        if (cleanSleep != null && (cleanSleep > 16 || cleanSleep < 0.5)) {
-            console.log(`[Sleep] Discarding invalid sleep value: ${cleanSleep}h`);
-            cleanSleep = null;
-        }
-        const hasSleep = cleanSleep != null && cleanSleep > 0.5;
+        const hasSleep = sleep != null && sleep > 0.5;
         const hasHRVBalance = hrvAvg14 > 0 && hrvBaseline60 > 0;
         
         // ═══════════════════════════════════════
@@ -843,12 +799,11 @@ const InsightEngine = {
         
         // ═══════════════════════════════════════
         // Sleep Component (0-25)
-        // No phantom credit: if no data, score = 0 and excluded from max
         // ═══════════════════════════════════════
-        let sleepScore = 0, sleepStatus = 'no data';
+        let sleepScore = 12, sleepStatus = 'no data';
         if (hasSleep) {
-            sleepScore = cleanSleep >= 8 ? 25 : cleanSleep >= 7 ? 22 : cleanSleep >= 6 ? 16 : cleanSleep >= 5 ? 10 : 5;
-            sleepStatus = cleanSleep >= 7.5 ? 'optimal' : cleanSleep >= 6.5 ? 'good' : cleanSleep >= 5.5 ? 'fair' : 'poor';
+            sleepScore = sleep >= 8 ? 25 : sleep >= 7 ? 22 : sleep >= 6 ? 16 : sleep >= 5 ? 10 : 5;
+            sleepStatus = sleep >= 7.5 ? 'optimal' : sleep >= 6.5 ? 'good' : sleep >= 5.5 ? 'fair' : 'poor';
         }
         
         // ═══════════════════════════════════════
@@ -876,20 +831,8 @@ const InsightEngine = {
             loadScore = 18; loadStatus = 'rest day';
         }
         
-        // Score with dynamic max: exclude missing components rather than giving phantom credit
-        const rawTotal = hrScore + hrvScore + sleepScore + loadScore;
-        const maxAvailable = (hasHR && hrAvg7 > 0 ? 25 : 0)
-            + (hasHRV || hasHRVBalance ? 30 : 0)
-            + (hasSleep ? 25 : 0)
-            + 20; // load always has a calculation path
-        const total = maxAvailable > 0 ? Math.round((rawTotal / maxAvailable) * 100) : 50;
-
-        // Track what data is missing for UI warnings
-        const missingData = [];
-        if (!hasSleep) missingData.push('sleep');
-        if (!hasHR || hrAvg7 <= 0) missingData.push('heart rate');
-        if (!hasHRV && !hasHRVBalance) missingData.push('HRV');
-
+        const total = hrScore + hrvScore + sleepScore + loadScore;
+        
         const getMessage = (score) => {
             if (score >= 85) return { text: "You're primed. Great day for intensity.", status: 'peak' };
             if (score >= 70) return { text: "Good recovery. Train as planned.", status: 'good' };
@@ -897,15 +840,14 @@ const InsightEngine = {
             if (score >= 40) return { text: "Recovery incomplete. Consider going easy.", status: 'low' };
             return { text: "Rest recommended. Your body needs recovery.", status: 'rest' };
         };
-
+        
         return {
             score: total,
             message: getMessage(total),
-            missingData,
             components: {
                 hr: { score: hrScore, max: 25, value: restingHR, avg: hrAvg7, diff: hrDiff, status: hrStatus },
-                hrv: { score: hrvScore, max: 30, value: hrv, avg7: hrvAvg7, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
-                sleep: { score: sleepScore, max: 25, value: cleanSleep, status: sleepStatus, hasSleep },
+                hrv: { score: hrvScore, max: 30, value: hrv, avg14: hrvAvg14, baseline60: hrvBaseline60, balance: hrvBalancePct, trend3d: hrvTrend3d, status: hrvStatus },
+                sleep: { score: sleepScore, max: 25, value: sleep, status: sleepStatus },
                 load: { score: loadScore, max: 20, ratio: loadRatio, trimp: trimpYesterday, avg: trimpAvg7, status: loadStatus }
             }
         };
@@ -1242,7 +1184,7 @@ const ContributorBar = ({ label, sublabel, value, max, score, maxScore, color = 
                 <div style={{ textAlign: 'right' }}>
                     <p className="data-value">{value}</p>
                     {status && (
-                        <span className={`trend trend-${status === 'optimal' || status === 'strong' || status === 'good' || status === 'light' ? 'up' : status === 'normal' || status === 'rest day' ? 'stable' : status === 'unavailable' || status === 'no data' ? 'neutral' : 'down'}`}
+                        <span className={`trend trend-${status === 'optimal' || status === 'strong' || status === 'good' || status === 'light' ? 'up' : status === 'normal' ? 'stable' : 'down'}`} 
                             style={{ fontSize: 11, padding: '2px 8px', marginTop: 4 }}>
                             {status}
                         </span>
@@ -1301,10 +1243,9 @@ const InsightBox = ({ title, text, color = 'blue' }) => (
 
 // Readiness Detail Modal
 const ReadinessModal = ({ data, onClose }) => {
-    const { score, message, components, missingData = [] } = data;
+    const { score, message, components } = data;
     const statusColor = score >= 70 ? 'var(--green)' : score >= 55 ? 'var(--yellow)' : 'var(--orange)';
-    const hasMissingData = missingData.length > 0;
-
+    
     return (
         <div className="modal-overlay open" onClick={onClose}>
             <div className="modal-sheet hide-scrollbar" onClick={e => e.stopPropagation()}>
@@ -1317,20 +1258,15 @@ const ReadinessModal = ({ data, onClose }) => {
                         <div>
                             <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 4, textTransform: 'capitalize' }}>{message.status}</p>
                             <p className="insight">{message.text}</p>
-                            {hasMissingData && (
-                                <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>
-                                    Based on available data ({4 - missingData.length}/4 sources)
-                                </p>
-                            )}
                         </div>
                     </div>
                 </div>
-
+                
                 <div className="modal-body">
                     <div className="modal-section">
                         <p className="label" style={{ marginBottom: 16 }}>CONTRIBUTING FACTORS</p>
-
-                        <ContributorBar
+                        
+                        <ContributorBar 
                             label="Resting Heart Rate"
                             sublabel={`7-day avg: ${components.hr.avg?.toFixed(0) || '—'} bpm`}
                             value={`${components.hr.value?.toFixed(0) || '—'} bpm`}
@@ -1339,35 +1275,32 @@ const ReadinessModal = ({ data, onClose }) => {
                             color={components.hr.status === 'optimal' || components.hr.status === 'normal' ? 'var(--green)' : 'var(--orange)'}
                             status={components.hr.status}
                         />
-
-                        <ContributorBar
+                        
+                        <ContributorBar 
                             label="Heart Rate Variability"
-                            sublabel={components.hrv.baseline60 > 0
+                            sublabel={components.hrv.baseline60 > 0 
                                 ? `Balance: ${components.hrv.balance >= 0 ? '+' : ''}${components.hrv.balance?.toFixed(0)}% vs 60-day avg`
-                                : `7-day avg: ${components.hrv.avg7?.toFixed(0) || '—'} ms`}
+                                : `7-day avg: ${hrvAvg7?.toFixed(0) || '—'} ms`}
                             value={`${components.hrv.value?.toFixed(0) || '—'} ms`}
                             score={components.hrv.score}
                             maxScore={components.hrv.max}
                             color={components.hrv.status === 'strong' || components.hrv.status === 'normal' ? 'var(--green)' : components.hrv.status === 'declining' || components.hrv.status === 'below avg' ? 'var(--yellow)' : 'var(--orange)'}
                             status={components.hrv.status}
                         />
-
-                        {/* Sleep: grey bar + "unavailable" when no data, colored bar when data exists */}
-                        <ContributorBar
+                        
+                        <ContributorBar 
                             label="Sleep"
-                            sublabel={components.sleep.hasSleep ? 'Last night' : 'Data unavailable — check Health Auto Export'}
-                            value={components.sleep.hasSleep ? `${components.sleep.value.toFixed(1)}h` : '—'}
-                            score={components.sleep.hasSleep ? components.sleep.score : 0}
+                            sublabel="Last night"
+                            value={components.sleep.value > 0.5 ? `${components.sleep.value.toFixed(1)}h` : '—'}
+                            score={components.sleep.score}
                             maxScore={components.sleep.max}
-                            color={!components.sleep.hasSleep ? 'rgba(255,255,255,0.15)'
-                                : components.sleep.status === 'optimal' || components.sleep.status === 'good' ? 'var(--green)'
-                                : components.sleep.status === 'fair' ? 'var(--yellow)' : 'var(--orange)'}
-                            status={components.sleep.hasSleep ? components.sleep.status : 'unavailable'}
+                            color={components.sleep.status === 'optimal' || components.sleep.status === 'good' ? 'var(--green)' : components.sleep.status === 'fair' ? 'var(--yellow)' : 'var(--orange)'}
+                            status={components.sleep.status}
                         />
-
-                        <ContributorBar
+                        
+                        <ContributorBar 
                             label="Training Load"
-                            sublabel={components.load.trimp > 0
+                            sublabel={components.load.trimp > 0 
                                 ? `TRIMP: ${components.load.trimp.toFixed(0)} vs avg ${components.load.avg.toFixed(0)}/day`
                                 : 'Yesterday vs 7-day average'}
                             value={components.load.status === 'rest day' ? 'Rest' : `${Math.round(components.load.ratio * 100)}%`}
@@ -1377,16 +1310,8 @@ const ReadinessModal = ({ data, onClose }) => {
                             status={components.load.status}
                         />
                     </div>
-
-                    {hasMissingData && (
-                        <InsightBox
-                            title="⚠️ Limited data"
-                            text={`${missingData.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')} data not available. Score is calculated from ${4 - missingData.length} of 4 data sources. ${missingData.includes('sleep') ? 'Check Health Auto Export sleep settings to improve accuracy.' : ''}`}
-                            color="orange"
-                        />
-                    )}
-
-                    <InsightBox
+                    
+                    <InsightBox 
                         title="💡 What this means"
                         text={message.text}
                         color={score >= 70 ? 'green' : score >= 55 ? 'orange' : 'red'}
@@ -1746,7 +1671,7 @@ const VolumeModal = ({ stats, targetVol, onClose }) => {
                                             </div>
                                             <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                                                 {dur > 0 && dist > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
-                                                {pace > 0 && pace < 600 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
+                                                {pace > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
                                                 {hr > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>❤️ {hr} bpm</span>}
                                             </div>
                                         </div>
@@ -1856,21 +1781,25 @@ function App() {
     const [testModal, setTestModal] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [daily, setDaily] = useState([]);
+    const [planData, setPlanData] = useState({ weekly: [], strengthA: [], strengthB: [] });
     const [tests, setTests] = useState(storage.get('tests', { twoKm: [], threshold: [], miniSim: [] }));
     const [historyRange, setHistoryRange] = useState('3M');
-    const [historyFilter, setHistoryFilter] = useState('All');
     const [loading, setLoading] = useState(true);
     const [planView, setPlanView] = useState('week'); // 'week' or 'phases'
     
     // Load data
     useEffect(() => {
         (async () => {
-            const [w, d] = await Promise.all([
+            const [w, d, wp, sa, sb] = await Promise.all([
                 fetchSheet(CONFIG.sheets.workouts),
-                fetchSheet(CONFIG.sheets.daily)
+                fetchSheet(CONFIG.sheets.daily),
+                fetchSheet(CONFIG.sheets.weeklyPlan).catch(() => []),
+                fetchSheet(CONFIG.sheets.strengthA).catch(() => []),
+                fetchSheet(CONFIG.sheets.strengthB).catch(() => [])
             ]);
             setWorkouts(w);
             setDaily(d);
+            setPlanData({ weekly: wp, strengthA: sa, strengthB: sb });
             setLoading(false);
         })();
     }, []);
@@ -1893,41 +1822,31 @@ function App() {
     // 14-MONTH PERIODIZATION (Feb 2026 → Apr 2027)
     // ============================================
     const phases = [
-        { name: 'Base 1', start: '2026-02-10', weeks: 6, focus: 'Aerobic Foundation', 
+        { name: 'Base 1', start: '2026-02-10', weeks: 8, focus: 'Aerobic Foundation', 
           volStart: 25, volEnd: 35, color: 'var(--green)',
-          distribution: '85% Z2 · 5% VO₂ · 10% Strength',
-          description: 'Build consistent running habit. Easy volume is king. Capillary density and mitochondrial adaptations.',
-          keyWorkouts: ['Long run (build to 90min)', '4-5 easy runs/week', '2x strength maintenance'] },
-        { name: 'Base 2', start: '2026-03-24', weeks: 6, focus: 'Volume + Threshold Introduction',
+          distribution: '80% Z2 · 5% VO₂ (strides) · 5% Progressive · 10% Strength',
+          description: 'Build consistent running habit. Easy volume + strides introduce speed. Progressive runs teach gear changes.',
+          keyWorkouts: ['Long run (build to 90min)', '4 runs/week + strides', '2× strength', 'Deload/test wk 4 & 8'] },
+        { name: 'Base 2', start: '2026-04-07', weeks: 8, focus: 'Volume + Threshold',
           volStart: 35, volEnd: 45, color: 'var(--green)',
-          distribution: '75% Z2 · 10% Threshold · 5% VO₂ · 10% Strength',
-          description: 'Continue building volume. Introduce threshold work to teach body to clear lactate.',
-          keyWorkouts: ['Long run (90-100min)', '20min tempo or 4×8min threshold', 'Easy volume continues'] },
-        { name: 'Build 1', start: '2026-05-05', weeks: 6, focus: 'VO₂max Development',
+          distribution: '70% Z2 · 10% Threshold/Compromised · 5% VO₂ · 5% Stations · 10% Strength',
+          description: 'Introduce threshold and compromised running (alternating weeks). VO₂max sessions begin. Stations stay sharp.',
+          keyWorkouts: ['Wk A: Running threshold · Wk B: Compromised (1km+station)', 'VO₂max Sunday', 'Long run 90-100min', 'Deload/test wk 4 & 8'] },
+        { name: 'Build 1', start: '2026-06-02', weeks: 8, focus: 'VO₂max + Threshold',
           volStart: 45, volEnd: 55, color: 'var(--orange)',
-          distribution: '70% Z2 · 10% Threshold · 12% VO₂max · 8% Strength',
-          description: 'Peak volume phase. Add VO₂max intervals to expand aerobic ceiling.',
-          keyWorkouts: ['Long run (100-110min)', '5×4min VO₂max intervals', 'Threshold session', 'Station practice (separate)'] },
-        { name: 'B-Race', start: '2026-06-16', weeks: 4, focus: 'Race Preparation',
-          volStart: 45, volEnd: 40, color: 'var(--cyan)',
-          distribution: '60% Z2 · 10% Threshold · 10% VO₂ · 10% Strength · 10% Sim',
-          description: 'Prepare for B-race (~Aug 2026). Target: 1:10-1:12. Add simulations and race-specific work.',
-          keyWorkouts: ['Full simulation every 2 weeks', 'Maintain threshold work', 'Taper final week'] },
-        { name: 'Build 2', start: '2026-07-14', weeks: 6, focus: 'Rebuild + Specificity',
-          volStart: 40, volEnd: 55, color: 'var(--orange)',
-          distribution: '70% Z2 · 12% Threshold · 10% VO₂ · 8% Strength',
-          description: 'Post B-race rebuild. Apply race learnings. Push threshold and VO₂max.',
-          keyWorkouts: ['Long run (100min+)', 'VO₂max intervals', 'Threshold repeats', 'Station-only sessions'] },
-        { name: 'Build 3', start: '2026-08-25', weeks: 6, focus: 'Peak Volume',
-          volStart: 55, volEnd: 60, color: 'var(--orange)',
-          distribution: '68% Z2 · 12% Threshold · 12% VO₂ · 8% Strength',
-          description: 'Highest volume block. Push weekly km toward 60. This is where the engine gets built.',
-          keyWorkouts: ['Long run (110-120min)', '2 quality sessions/week', 'Station maintenance'] },
-        { name: 'Race Specific', start: '2026-10-06', weeks: 6, focus: 'HYROX-Specific Work',
+          distribution: '65% Z2 · 12% Threshold/Compromised · 10% VO₂ · 5% Stations · 8% Strength',
+          description: 'Push VO₂max ceiling. Threshold continues alternating with compromised running. Peak volume building.',
+          keyWorkouts: ['5×4min VO₂max', 'Alternating threshold/compromised', 'Long run 100-110min', 'Deload/test wk 4 & 8'] },
+        { name: 'Build 2', start: '2026-07-28', weeks: 8, focus: 'Peak Volume + Specificity',
+          volStart: 50, volEnd: 60, color: 'var(--orange)',
+          distribution: '65% Z2 · 12% Threshold/Compromised · 12% VO₂ · 3% Stations · 8% Strength',
+          description: 'Highest volume block. Push weekly km toward 60. Engine gets built here.',
+          keyWorkouts: ['Long run 110-120min', '2 quality sessions/week', 'Compromised running focus', 'Deload/test wk 4 & 8'] },
+        { name: 'Race Specific', start: '2026-09-22', weeks: 8, focus: 'HYROX-Specific',
           volStart: 50, volEnd: 50, color: 'var(--red)',
-          distribution: '60% Z2 · 10% Threshold · 10% VO₂ · 5% Strength · 15% Sim',
-          description: 'Running under fatigue becomes the focus. Simulations increase. Dial in race pacing.',
-          keyWorkouts: ['Full sim every 2 weeks', 'Running after strength work', 'Race-pace 1km repeats with stations'] },
+          distribution: '55% Z2 · 10% Threshold · 10% VO₂ · 10% Compromised · 5% Str · 10% Sim',
+          description: 'Running under fatigue = focus. Simulations increase. Compromised running every week. Dial in pacing.',
+          keyWorkouts: ['Full sim every 2 weeks', 'Compromised running weekly', 'Race-pace 1km repeats', 'Deload/test wk 4 & 8'] },
         { name: 'Peak + Taper', start: '2026-11-17', weeks: 4, focus: 'Taper to A-Race',
           volStart: 45, volEnd: 25, color: 'var(--purple)',
           distribution: 'Reduce volume 40-50%, maintain intensity',
@@ -1951,65 +1870,208 @@ function App() {
     const phaseProgress = Math.min(1, weeksIntoPhase / currentPhase.weeks);
     const currentTargetVol = currentPhase.volStart + (currentPhase.volEnd - currentPhase.volStart) * phaseProgress;
     
+    // 4-week training cycle: Wk 1-3 normal, Wk 4 deload/test
+    const cycleWeek = (weeksIntoPhase % 4) + 1;
+    const isDeload = cycleWeek === 4;
+    const isWeekA = weeksIntoPhase % 2 === 0; // Alternates threshold (A) vs compromised (B)
+    
     // ============================================
     // WEEKLY PLAN (Phase-dependent)
     // ============================================
     const getWeekPlan = () => {
         const phase = currentPhase.name;
         
-        // Base 1 & 2: Heavy Z2, build volume
-        if (phase === 'Base 1') return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base building. Conversational pace. HR 130-145.', targets: { HR: '130-145 bpm', Pace: '5:30-6:30/km' }, structure: [{ block: 'Warm-up', time: '5 min', note: 'Walk to easy jog' }, { block: 'Easy Run', time: '40 min', note: 'Conversational pace' }, { block: 'Cool-down', time: '5 min', note: 'Walk' }] },
-            { day: 'Tuesday', type: 'Strength A: Lower + Push', zone: 'str', duration: 45, distance: 0, purpose: 'Maintain strength. Not powerlifting — protecting your gains for sled/carry performance.', exercises: ['Hex bar deadlift: 3×5', 'Bulgarian split squat: 3×8 each', 'DB bench press: 3×8', 'Core: 2×30 sec plank'] },
-            { day: 'Wednesday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Volume accumulation. Keep it genuinely easy — this is where adaptation happens.', targets: { HR: '130-145 bpm', Pace: '5:30-6:30/km' } },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Consistent easy volume. Brownlee research: running days per week is the #1 predictor.', targets: { HR: '130-145 bpm', Pace: '5:30-6:30/km' } },
-            { day: 'Friday', type: 'Strength B: Upper + Pull', zone: 'str', duration: 45, distance: 0, purpose: 'Upper body maintenance for wall balls, ski erg, and rope pull.', exercises: ['Weighted pull-ups: 3×6-8', 'DB rows: 3×10 each', 'OH press: 3×8', 'Farmer carry: 3×40m'] },
-            { day: 'Saturday', type: 'Long Run', zone: 2, duration: 75, distance: 12, purpose: 'Time on feet. Build to 90 min over this phase. Easy effort — no racing the long run.', targets: { HR: '130-145 bpm', Feel: 'Could talk in sentences' }, structure: [{ block: 'Easy pace', time: '75 min', note: 'Flat to rolling terrain preferred' }] },
-            { day: 'Sunday', type: 'Rest / Light Stations', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest or 30-min station-only practice (no running). Keep movements sharp without adding fatigue.', exercises: ['Optional: Ski erg 1000m', 'Sled push 4×25m', 'Wall balls 4×25 reps', 'Row 1000m'] }
-        ];
+        // Try to build plan from Google Sheet data
+        if (planData.weekly.length > 0) {
+            const phaseRows = planData.weekly.filter(r => r['Phase'] === phase);
+            if (phaseRows.length > 0) {
+                return phaseRows.map(r => {
+                    const zoneMap = { 'Z2': 2, 'Threshold': 4, 'VO₂max': 5, 'Strength': 'str', 'Simulation': 'sim', 'Rest': 'rest' };
+                    const zone = zoneMap[r['Zone']] || 'rest';
+                    
+                    // Parse exercises from pipe-separated string
+                    const exercises = r['Details / Structure'] && r['Details / Structure'].includes('|') 
+                        ? r['Details / Structure'].split('|').map(s => s.trim())
+                        : null;
+                    
+                    // Parse structure from pipe-separated "block:time:note" format
+                    const structure = r['Details / Structure'] && r['Details / Structure'].includes('→')
+                        ? r['Details / Structure'].split('→').map(s => {
+                            const parts = s.trim().split(':');
+                            return { block: parts[0]?.trim(), time: parts[1]?.trim() || '', note: parts[2]?.trim() || '' };
+                        })
+                        : null;
+                    
+                    // Parse targets from pipe-separated "key:value" format  
+                    const targets = {};
+                    if (r['Targets'] && r['Targets'] !== '—') {
+                        r['Targets'].split('·').forEach(t => {
+                            const [k, v] = t.trim().split(/:\s*(.+)/);
+                            if (k && v) targets[k.trim()] = v.trim();
+                            else if (k) targets['Target'] = k.trim();
+                        });
+                    }
+                    
+                    // For strength days, get exercises from StrengthA/B sheets
+                    let strengthExercises = null;
+                    if (zone === 'str' && r['Session Type']?.includes('A')) {
+                        const weekType = (weeksIntoPhase % 2 === 0) ? 'WEEK A' : 'WEEK B';
+                        strengthExercises = getStrengthExercises(planData.strengthA, weekType, phase);
+                    } else if (zone === 'str' && r['Session Type']?.includes('B')) {
+                        const weekType = (weeksIntoPhase % 2 === 0) ? 'WEEK A' : 'WEEK B';
+                        strengthExercises = getStrengthExercises(planData.strengthB, weekType, phase);
+                    }
+                    
+                    return {
+                        day: r['Day'],
+                        type: r['Session Type'],
+                        zone,
+                        duration: parseFloat(r['Duration']?.replace(/[^\d.]/g, '')) || 0,
+                        distance: parseFloat(r['Distance']?.replace(/[^\d.]/g, '')) || 0,
+                        purpose: r['Main Focus'] || '',
+                        targets: Object.keys(targets).length > 0 ? targets : undefined,
+                        structure: structure || undefined,
+                        exercises: strengthExercises || exercises || undefined
+                    };
+                });
+            }
+        }
         
-        if (phase === 'Base 2') return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base. Morning Z2 before work.', targets: { HR: '130-145 bpm', Pace: '5:30-6:00/km' } },
-            { day: 'Tuesday', type: 'Strength A: Lower + Push', zone: 'str', duration: 45, distance: 0, purpose: 'Strength maintenance.', exercises: ['Hex bar deadlift: 3×5', 'Bulgarian split squat: 3×8 each', 'DB bench press: 3×8', 'Core: 2×30 sec'] },
-            { day: 'Wednesday', type: 'Tempo Run', zone: 4, duration: 40, distance: 7, purpose: 'Threshold introduction. Teaching your body to clear lactate at higher intensities.', targets: { HR: '160-170 bpm', Pace: '4:30-5:00/km' }, structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy jog' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard — can speak short phrases' }, { block: 'Cool-down', time: '10 min', note: 'Easy jog' }] },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery run. Keep it genuinely easy after yesterday\'s tempo.', targets: { HR: '130-145 bpm' } },
-            { day: 'Friday', type: 'Strength B: Upper + Pull', zone: 'str', duration: 45, distance: 0, purpose: 'Upper body maintenance.', exercises: ['Weighted pull-ups: 3×6-8', 'DB rows: 3×10 each', 'OH press: 3×8', 'Farmer carry: 3×40m'] },
-            { day: 'Saturday', type: 'Long Run', zone: 2, duration: 90, distance: 14, purpose: 'Build to 100 min. Volume accumulation — the #1 predictor of performance.', targets: { HR: '130-145 bpm' } },
-            { day: 'Sunday', type: 'Rest / Light Stations', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest or easy station-only practice.', exercises: ['Optional station work (30 min max, no running)'] }
-        ];
+        // ═══ FALLBACK: Hardcoded plans (used if sheet not available) ═══
+        // 4-week cycle: Wk 1-3 normal, Wk 4 deload/test (60% volume)
         
-        // Build phases: Add VO2max work
-        if (phase === 'Build 1' || phase === 'Build 2' || phase === 'Build 3') return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic volume. Morning Z2.', targets: { HR: '130-145 bpm' } },
-            { day: 'Tuesday', type: 'Strength A + Easy Run', zone: 'str', duration: 75, distance: 4, purpose: 'Strength maintenance + short easy run to build volume.', exercises: ['Hex bar deadlift: 3×5', 'Bulgarian split squat: 3×8', 'DB press: 3×8', 'Then: 25-30 min easy run'] },
-            { day: 'Wednesday', type: 'Tempo / Threshold', zone: 4, duration: 45, distance: 8, purpose: 'Lactate threshold work. Sustainable hard effort.', targets: { HR: '160-170 bpm', Pace: '4:20-4:50/km' }, structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy jog' }, { block: 'Threshold', time: '25 min', note: '4×8 min with 2 min jog recovery' }, { block: 'Cool-down', time: '10 min', note: 'Easy jog' }] },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Recovery volume. Conversational.', targets: { HR: '130-145 bpm' } },
-            { day: 'Friday', type: 'VO₂max Intervals', zone: 5, duration: 45, distance: 7, purpose: 'Expand aerobic ceiling. 90-95% max HR. This is where your VO₂max grows.', targets: { HR: '170-185 bpm', Pace: '3:50-4:20/km' }, structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy jog + strides' }, { block: 'Intervals', time: '20-25 min', note: '5×4 min hard, 3 min easy jog' }, { block: 'Cool-down', time: '10 min', note: 'Easy jog' }] },
-            { day: 'Saturday', type: 'Long Run', zone: 2, duration: 100, distance: 16, purpose: 'Peak long run. Time on feet building aerobic endurance.', targets: { HR: '130-145 bpm' } },
-            { day: 'Sunday', type: 'Stations Only / Rest', zone: 'rest', duration: 30, distance: 0, purpose: 'Station practice separated from running. Keep movements sharp.', exercises: ['Ski erg 1000m', 'Sled push 4×25m heavy', 'Burpees 4×20m', 'Wall balls 4×25', 'Row 1000m'] }
-        ];
+        if (phase === 'Base 1') {
+            if (isDeload) return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume. Keep easy.' },
+                { day: 'Tuesday', type: 'Strength A: Push (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['Hex Bar Squat: 2×5 @100kg', 'DB Floor Press: 2×5 @24kg', 'DB Lunges: 2×5/5 @22kg', 'Core: 1 set', '8s Sprints × 3'] },
+                { day: 'Wednesday', type: '2km Time Trial', zone: 5, duration: 25, distance: 4, purpose: 'TEST: 2km TT. Warm up 10min, all-out 2km, cool down.', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + 3 strides' }, { block: '2km TT', time: '~9 min', note: 'ALL OUT — track your time' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery after TT.' },
+                { day: 'Friday', type: 'Strength B: Pull (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets. Keep loads moderate.', exercises: ['Hex Bar DL: 2×5 @110kg', 'KB Row: 2×6/6 @32kg', 'KB Swing: 2×8 @32kg', 'Core: 1 set', '8s Sprints × 3'] },
+                { day: 'Saturday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Easy shake-out. Shorter than normal long run.' },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Recover for next cycle.' }
+            ];
+            return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base building. Conversational pace.' },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['Hex Bar Squat: 3×5 @120kg', 'DB Floor Press: 3×5 @28kg', 'DB Lunges: 3×5/5 @28kg', 'DB Squat Jumps: 3×6 @16kg', 'Cable Rotations: 3×8/8', 'Standing Calf Raise: 3×6/6', '8s Sprints × 4'] },
+                { day: 'Wednesday', type: 'Progressive Run', zone: 2, duration: 50, distance: 8, purpose: 'Easy 35min → last 15min at tempo feel. Teaching gear change.', structure: [{ block: 'Easy', time: '35 min', note: 'Conversational' }, { block: 'Progressive', time: '15 min', note: 'Build to comfortably hard' }] },
+                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, purpose: 'Easy run. Last 8min: 6×30s strides at 90% effort, 60s walk recovery.', structure: [{ block: 'Easy run', time: '37 min', note: 'Conversational' }, { block: 'Strides', time: '8 min', note: '6×30s fast, 60s walk between' }] },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['Hex Bar Deadlift: 3×5 @130kg', 'KB Row: 3×6/6 @32kg', 'KB Swing: 3×8 @32kg', 'Cleans: 3×5 @60kg', 'Hurricane Slams: 3×6/6', 'Seated Calf Raise: 3×8', '8s Sprints × 4'] },
+                { day: 'Saturday', type: 'Long Run', zone: 2, duration: 75, distance: 12, purpose: 'Time on feet. Build 5min/week to 90min.' },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Recovery is where adaptation happens.' }
+            ];
+        }
         
-        // B-Race & Race Specific: Add simulations
-        if (phase === 'B-Race' || phase === 'Race Specific') return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery from weekend. Easy volume.', targets: { HR: '130-145 bpm' } },
-            { day: 'Tuesday', type: 'Strength (Maintenance)', zone: 'str', duration: 40, distance: 0, purpose: 'Reduced volume strength. Protect gains, don\'t build.', exercises: ['Hex bar deadlift: 2×5', 'Split squat: 2×8', 'Pull-ups: 2×8', 'Farmer carry: 2×40m'] },
-            { day: 'Wednesday', type: 'Threshold + Stations', zone: 4, duration: 50, distance: 6, purpose: 'Race-specific: running at threshold then hitting a station under fatigue.', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy jog' }, { block: 'Threshold intervals', time: '20 min', note: '4×5 min threshold' }, { block: 'Station practice', time: '15 min', note: 'Wall balls + sled under fatigue' }, { block: 'Cool-down', time: '5 min', note: 'Walk' }] },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery run.', targets: { HR: '130-145 bpm' } },
-            { day: 'Friday', type: 'VO₂max / Speed', zone: 5, duration: 40, distance: 6, purpose: 'Keep the ceiling high. Short, sharp efforts.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '18 min', note: '6×3 min hard, 2 min jog' }, { block: 'Cool-down', time: '10 min' }] },
-            { day: 'Saturday', type: 'Race Simulation', zone: 'sim', duration: 80, distance: 8, purpose: 'Full or half simulation. Practice pacing, transitions, and race-day strategy. Every 2 weeks only.', structure: [{ block: 'Full sim', time: '60-80 min', note: '4-8 rounds: 1km run + station' }] },
-            { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Trust the process.' }
-        ];
+        if (phase === 'Base 2') {
+            if (isDeload) return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume.' },
+                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise. Movement quality.'] },
+                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery after test.' },
+                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }] },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' }
+            ];
+            return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base. Morning Z2.' },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab — alternates Week A/B'] },
+                { day: 'Wednesday', type: isWeekA ? 'Running Threshold' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 7 : 6, purpose: isWeekA ? 'Pure running threshold. Clean data for tracking.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, purpose: 'Easy run + 6×30s strides at end.' },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab — alternates Week A/B'] },
+                { day: 'Saturday', type: 'Long Run', zone: 2, duration: 90, distance: 14, purpose: 'Build to 100min. Time on feet.' },
+                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, purpose: 'VO₂max stimulus. Push the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }] }
+            ];
+        }
+        
+        if (phase === 'Build 1' || phase === 'Build 2') {
+            if (isDeload) return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume.' },
+                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, purpose: 'TEST: Alternate each deload week.' },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery.' },
+                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 45, distance: 4, purpose: 'TEST: 4×(1km + station). Rotate station focus: ski erg → sled push → row → farmer carry.' },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' }
+            ];
+            return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic volume.' },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab'] },
+                { day: 'Wednesday', type: isWeekA ? 'Threshold Intervals' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 8 : 6, purpose: isWeekA ? 'Threshold repeats. Clean running data.' : 'Compromised: 4×(1km threshold + station). Priority: ski erg, sled push.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '25 min', note: '4×8min threshold (2min jog)' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + ski erg 500m or sled 4×25m' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Recovery volume.' },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab'] },
+                { day: 'Saturday', type: 'Long Run', zone: 2, duration: phase === 'Build 1' ? 100 : 115, distance: phase === 'Build 1' ? 16 : 18, purpose: phase === 'Build 1' ? 'Build to 110min.' : 'Peak long run 110-120min.' },
+                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 40, distance: 6, purpose: 'VO₂max session. Expand the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '20 min', note: '5×4min hard (3min jog)' }, { block: 'Cool-down', time: '10 min' }] }
+            ];
+        }
+        
+        if (phase === 'Race Specific') {
+            if (isDeload) return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK.' },
+                { day: 'Tuesday', type: 'Strength (light)', zone: 'str', duration: 40, distance: 0, purpose: '2 sets. Maintenance.', exercises: ['2 sets per exercise.'] },
+                { day: 'Wednesday', type: 'Test: Compromised Run', zone: 4, duration: 50, distance: 6, purpose: 'TEST: 4×(1km + station). Track splits + total time vs previous.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km + rotating stations' }] },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery.' },
+                { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' },
+                { day: 'Saturday', type: 'Race Simulation', zone: 'sim', duration: 80, distance: 8, purpose: 'Full sim: 8×(1km + station). Race effort.', structure: [{ block: 'Full simulation', time: '60-80 min', note: '8 rounds at race pace' }] },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest after sim.' }
+            ];
+            return [
+                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery from weekend.' },
+                { day: 'Tuesday', type: 'Strength A (reduced)', zone: 'str', duration: 50, distance: 0, purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
+                { day: 'Wednesday', type: 'Compromised Running', zone: 4, duration: 50, distance: 6, purpose: 'Every week now: 4×(1km threshold + station). This IS the race.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km + station (rotate ski/sled/row/carry)' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery.' },
+                { day: 'Friday', type: 'Strength B (reduced)', zone: 'str', duration: 50, distance: 0, purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
+                { day: 'Saturday', type: isWeekA ? 'Long Run' : 'Race Simulation', zone: isWeekA ? 2 : 'sim', duration: isWeekA ? 80 : 80, distance: 8, purpose: isWeekA ? 'Maintain aerobic base.' : 'Full or half sim. Every 2 weeks.', structure: isWeekA ? undefined : [{ block: 'Simulation', time: '60-80 min', note: '4-8 rounds: 1km + station' }] },
+                { day: 'Sunday', type: 'VO₂max / Sharp Session', zone: 5, duration: 35, distance: 5, purpose: 'Keep ceiling high. Short and sharp.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15 min', note: '6×2min hard (90s jog)' }, { block: 'Cool-down', time: '10 min' }] }
+            ];
+        }
         
         // Peak + Taper
         return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 35, distance: 5, purpose: 'Reduced volume. Stay loose.', targets: { HR: '130-140 bpm' } },
-            { day: 'Tuesday', type: 'Light Strength', zone: 'str', duration: 30, distance: 0, purpose: 'Very light. Movement quality only.', exercises: ['Deadlift: 2×3 light', 'Bodyweight squats', 'Light carries'] },
-            { day: 'Wednesday', type: 'Short Sharp Session', zone: 4, duration: 30, distance: 4, purpose: 'Keep the engine primed. Short threshold efforts.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Threshold', time: '10 min', note: '2×5 min' }, { block: 'Cool-down', time: '10 min' }] },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 30, distance: 4, purpose: 'Gentle shakeout.', targets: { HR: '< 140 bpm' } },
+            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 35, distance: 5, purpose: 'Reduced volume. Stay loose.' },
+            { day: 'Tuesday', type: 'Light Strength', zone: 'str', duration: 30, distance: 0, purpose: 'Movement quality only. 2 sets each.', exercises: ['Hex DL: 2×3 @100kg', 'Bodyweight squats', 'Light carries', 'Core: 1 set'] },
+            { day: 'Wednesday', type: 'Short Sharp Session', zone: 4, duration: 30, distance: 4, purpose: 'Keep engine primed.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Threshold', time: '10 min', note: '2×5min' }, { block: 'Cool-down', time: '10 min' }] },
+            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 30, distance: 4, purpose: 'Gentle shakeout.' },
             { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Hydrate. Sleep.' },
-            { day: 'Saturday', type: 'Shakeout + Strides', zone: 2, duration: 20, distance: 3, purpose: 'Light run with 4-5 strides. Stay sharp without loading.' },
-            { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Race week rest. Trust your training.' }
+            { day: 'Saturday', type: 'Shakeout + Strides', zone: 2, duration: 20, distance: 3, purpose: 'Light run with strides. Stay sharp.' },
+            { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Race week rest.' }
         ];
+    };
+    
+    // Helper: extract strength exercises from sheet for current week type
+    const getStrengthExercises = (sheetData, weekType, phase) => {
+        if (!sheetData || sheetData.length === 0) return null;
+        
+        // Find the section matching weekType (e.g., "WEEK A" or "WEEK B")
+        let inSection = false;
+        const exercises = [];
+        const isRacePhase = phase === 'B-Race' || phase === 'Race Specific' || phase === 'Peak + Taper';
+        
+        for (const row of sheetData) {
+            const exercise = row['Exercise'] || '';
+            const category = row['Category'] || '';
+            
+            // Detect section headers
+            if (exercise.includes(weekType)) {
+                inSection = true;
+                continue;
+            }
+            if (exercise.includes('WEEK') && !exercise.includes(weekType)) {
+                if (inSection) break; // We've passed our section
+                continue;
+            }
+            
+            if (inSection && exercise && category) {
+                const sets = row['Sets × Reps'] || '';
+                const load = row['Load'] || '';
+                
+                // For race phases, reduce volume (2 sets instead of 3)
+                const displaySets = isRacePhase ? sets.replace(/^[34]/, '2') : sets;
+                
+                const line = load ? `${exercise}: ${displaySets} @${load}` : `${exercise}: ${displaySets}`;
+                exercises.push(line);
+            }
+        }
+        
+        return exercises.length > 0 ? exercises : null;
     };
     
     const weekPlan = getWeekPlan();
@@ -2032,22 +2094,19 @@ function App() {
         const sortedDaily = [...daily].sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
         
         // Find latest row with actual HR data (skip empty/null rows)
-        const findLatest = (field, maxValid) => {
+        const findLatest = (field) => {
             for (let i = sortedDaily.length - 1; i >= 0; i--) {
                 const val = parseFloat(sortedDaily[i][field]);
-                if (val > 0 && (!maxValid || val <= maxValid)) return val;
+                if (val > 0) return val;
             }
             return null;
         };
-
+        
         const restingHR = findLatest('Resting HR');
         const hrv = findLatest('HRV (ms)');
-        const sleep = findLatest('Sleep Duration (hr)', 16); // skip values > 16h (bad data)
+        const sleep = findLatest('Sleep Duration (hr)');
         const vo2max = findLatest('VO2 Max') || CONFIG.baselines.vo2max;
-
-        // Sanitize sleep in this scope too (used in return values below)
-        const cleanSleep = (sleep != null && sleep >= 0.5 && sleep <= 16) ? sleep : null;
-
+        
         // 7-day averages — use rows from the last 7 calendar days
         const recent7Daily = sortedDaily.filter(d => new Date(d['Date']) >= last7);
         // If no data in last 7 days, fall back to last 7 rows that have data
@@ -2060,7 +2119,7 @@ function App() {
         const hrAvg7 = math.mean(hrValues7.length > 0 ? hrValues7 : allHR.slice(-7));
         const hrvAvg7 = math.mean(hrvValues7.length > 0 ? hrvValues7 : allHRV.slice(-7));
         
-        console.log('[Readiness Debug]', { restingHR, hrv, sleep: cleanSleep, vo2max, hrAvg7, hrvAvg7 });
+        console.log('[Readiness Debug]', { restingHR, hrv, sleep, vo2max, hrAvg7, hrvAvg7, hrValues7Count: hrValues7.length, hrvValues7Count: hrvValues7.length, allHRCount: allHR.length, dailyRows: sortedDaily.length, recent7Count: recent7Daily.length });
         
         // ═══ HRV Balance (Oura-style): 14-day weighted avg vs 60-day baseline ═══
         const last14 = daysAgo(14);
@@ -2108,14 +2167,9 @@ function App() {
             return dur * (avgHR / maxHR);
         };
         
-        // Yesterday's TRIMP — compare using date objects to handle different date formats
-        const yesterdayDate = daysAgo(1);
-        const yesterdayWorkouts = workouts.filter(w => {
-            const d = new Date(w['Date']);
-            return d.getFullYear() === yesterdayDate.getFullYear()
-                && d.getMonth() === yesterdayDate.getMonth()
-                && d.getDate() === yesterdayDate.getDate();
-        });
+        // Yesterday's TRIMP
+        const yesterday = daysAgo(1).toISOString().split('T')[0];
+        const yesterdayWorkouts = workouts.filter(w => w['Date'] === yesterday);
         const trimpYesterday = yesterdayWorkouts.reduce((s, w) => s + calcTrimp(w), 0);
         
         // 7-day rolling average TRIMP per day
@@ -2150,57 +2204,22 @@ function App() {
             twoKm: tests.twoKm?.length > 0 ? tests.twoKm[tests.twoKm.length - 1] : null,
             threshold: tests.threshold?.length > 0 ? tests.threshold[tests.threshold.length - 1] : null
         };
-
-        // Track which days this week (Mon-Sun) have completed workouts
-        // Calculate Monday of current week
-        const todayDay = today.getDay(); // 0=Sun
-        const mondayOffset = todayDay === 0 ? -6 : 1 - todayDay;
-        const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() + mondayOffset);
-        const completedDays = {};
-        workouts.forEach(w => {
-            const d = new Date(w['Date']);
-            const diff = Math.floor((d - monday) / 86400000);
-            if (diff >= 0 && diff <= 6) {
-                const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-                const dayName = dayNames[diff];
-                if (dayName) {
-                    if (!completedDays[dayName]) completedDays[dayName] = [];
-                    completedDays[dayName].push(w);
-                }
-            }
-        });
-
-        // Data freshness check: compare last 3 days of steps to 14-day average
-        let dataWarning = null;
-        const last3Daily = sortedDaily.filter(d => new Date(d['Date']) >= daysAgo(3));
-        const last14Daily = sortedDaily.filter(d => new Date(d['Date']) >= daysAgo(14));
-        if (last14Daily.length >= 7) {
-            const steps14 = last14Daily.map(d => parseFloat(d['Steps']) || 0).filter(v => v > 0);
-            const stepsRecent = last3Daily.map(d => parseFloat(d['Steps']) || 0);
-            const avgSteps14 = steps14.length > 0 ? steps14.reduce((a, b) => a + b, 0) / steps14.length : 0;
-            const avgStepsRecent = stepsRecent.length > 0 ? stepsRecent.reduce((a, b) => a + b, 0) / stepsRecent.length : 0;
-            if (avgSteps14 > 1000 && avgStepsRecent < avgSteps14 * 0.2) {
-                dataWarning = 'Recent health data looks incomplete — check Health Auto Export sync';
-            }
-        }
-
+        
         return {
             workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
-            completedDays,
-            dataWarning,
-            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: cleanSleep || 0, vo2max },
-            readinessInput: { restingHR, hrv, sleep: cleanSleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
+            latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
+            readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
-            raceInput: {
-                twoKm: latestTests.twoKm?.time || 0,
-                threshold: latestTests.threshold?.pace || 0,
-                weeklyKm,
+            raceInput: { 
+                twoKm: latestTests.twoKm?.time || 0, 
+                threshold: latestTests.threshold?.pace || 0, 
+                weeklyKm, 
                 paceDecay: tests.miniSim?.length > 0 ? parseFloat(tests.miniSim[tests.miniSim.length - 1].decay) : 0,
-                vo2max
+                vo2max 
             },
-            hyroxInput: {
-                latestSim: tests.miniSim?.length > 0 ? tests.miniSim[tests.miniSim.length - 1] : null,
-                simHistory: tests.miniSim || []
+            hyroxInput: { 
+                latestSim: tests.miniSim?.length > 0 ? tests.miniSim[tests.miniSim.length - 1] : null, 
+                simHistory: tests.miniSim || [] 
             },
             historyData: { vo2History, volHistory },
             latestTests
@@ -2208,7 +2227,7 @@ function App() {
     }, [workouts, daily, tests, loading]);
     
     // Compute insight scores
-    const readiness = computedData ? InsightEngine.readiness(computedData.readinessInput) : { score: 0, message: { text: 'Loading...', status: 'loading' }, missingData: [], components: { hr: {}, hrv: {}, sleep: {}, load: {} } };
+    const readiness = computedData ? InsightEngine.readiness(computedData.readinessInput) : { score: 0, message: { text: 'Loading...', status: 'loading' }, components: { hr: {}, hrv: {}, sleep: {}, load: {} } };
     const aerobic = computedData ? InsightEngine.aerobic(computedData.aerobicInput) : { score: 0, vo2max: 0, trend: 'stable', vo2Trend: 0 };
     const racePrediction = computedData ? InsightEngine.racePrediction(computedData.raceInput) : { predicted: 0, formatted: '—', gap: 0, confidence: 'low', breakdown: {}, insight: { title: '', text: '', color: 'blue' } };
     const hyroxReady = computedData ? InsightEngine.hyroxReady(computedData.hyroxInput) : { score: null, hasSim: false, insight: { title: '', text: '', color: 'blue' } };
@@ -2217,8 +2236,6 @@ function App() {
     const latestDaily = computedData?.latestDaily || {};
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
-    const completedDays = computedData?.completedDays || {};
-    const dataWarning = computedData?.dataWarning || null;
     
     // Today's session
     const todaySession = weekPlan.find(s => s.day === todayName) || weekPlan[0];
@@ -2238,23 +2255,13 @@ function App() {
         <div className="container hide-scrollbar">
             <div className="px-5 py-4 fade-up">
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks}
+                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? '🔄 DELOAD/TEST' : `Cycle ${cycleWeek}/4`}{!isDeload && currentPhase.name !== 'Base 1' && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
                 </p>
                 <h1 style={{ fontSize: 28, fontWeight: 600, marginTop: 4 }}>
                     {todayName === 'Sunday' ? 'Rest Day' : `Today: ${todaySession.type}`}
                 </h1>
             </div>
             
-            {/* Data freshness warning */}
-            {dataWarning && (
-                <div className="px-5 mb-4 fade-up" style={{ }}>
-                    <div style={{ background: 'var(--orange-dim)', border: '1px solid rgba(255,159,10,0.2)', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ fontSize: 16 }}>⚠</span>
-                        <p style={{ fontSize: 13, color: 'var(--orange)', lineHeight: 1.3 }}>{dataWarning}</p>
-                    </div>
-                </div>
-            )}
-
             {/* Today's Session Card */}
             <div className="px-5 mb-4 fade-up delay-1">
                 <SessionCard session={todaySession} isToday={true} onClick={() => setModal({ type: 'session', data: todaySession })} />
@@ -2401,54 +2408,30 @@ function App() {
                         <p className="label">THIS WEEK</p>
                     </div>
                     <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {weekPlan.map((session, i) => {
-                            const dayWorkouts = completedDays[session.day] || [];
-                            const isCompleted = dayWorkouts.length > 0;
-                            const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                            const isPast = dayNames.indexOf(session.day) < today.getDay() || (today.getDay() === 0 && session.day !== 'Sunday');
-                            const isToday = session.day === todayName;
-
-                            return (
-                                <div key={i} className="card" style={{
-                                    padding: 16, cursor: 'pointer',
-                                    border: isToday ? '1px solid var(--blue)' : isCompleted ? '1px solid rgba(48,209,88,0.3)' : '1px solid var(--border)',
-                                    opacity: isPast && !isCompleted && !isToday ? 0.6 : 1
-                                }} onClick={() => setModal({ type: 'session', data: session })}>
-                                    <div className="flex flex-between flex-center">
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            {isCompleted && (
-                                                <div style={{
-                                                    width: 22, height: 22, borderRadius: '50%',
-                                                    background: 'var(--green)', display: 'flex',
-                                                    alignItems: 'center', justifyContent: 'center',
-                                                    fontSize: 13, fontWeight: 700, flexShrink: 0
-                                                }}>✓</div>
-                                            )}
-                                            <div>
-                                                <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                                                    {session.day}{isToday && ' · Today'}
-                                                    {isCompleted && dayWorkouts.map(w => {
-                                                        const d = parseFloat(w['Distance (km)']) || 0;
-                                                        const dur = parseFloat(w['Duration (min)']) || 0;
-                                                        return d > 0 ? ` · ${d.toFixed(1)}km` : dur > 0 ? ` · ${fmt.duration(dur)}` : '';
-                                                    }).join('')}
-                                                </p>
-                                                <p style={{ fontWeight: 500 }}>{session.type}</p>
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                            {session.duration > 0 && (
-                                                <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{session.duration}min</span>
-                                            )}
-                                            <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`}
-                                                style={{ padding: '4px 10px', fontSize: 11, marginBottom: 0 }}>
-                                                {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : 'REST'}
-                                            </span>
-                                        </div>
+                        {weekPlan.map((session, i) => (
+                            <div key={i} className="card" style={{ 
+                                padding: 16, cursor: 'pointer',
+                                border: session.day === todayName ? '1px solid var(--blue)' : '1px solid var(--border)'
+                            }} onClick={() => setModal({ type: 'session', data: session })}>
+                                <div className="flex flex-between flex-center">
+                                    <div>
+                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
+                                            {session.day}{session.day === todayName && ' · Today'}
+                                        </p>
+                                        <p style={{ fontWeight: 500 }}>{session.type}</p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        {session.duration > 0 && (
+                                            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{session.duration}min</span>
+                                        )}
+                                        <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`} 
+                                            style={{ padding: '4px 10px', fontSize: 11, marginBottom: 0 }}>
+                                            {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : 'REST'}
+                                        </span>
                                     </div>
                                 </div>
-                            );
-                        })}
+                            </div>
+                        ))}
                     </div>
                     
                     {/* Key Principles */}
@@ -2524,44 +2507,30 @@ function App() {
         const rangeMap = { '3M': 90, '6M': 180, 'Y': 365, 'All': 9999 };
         const days = rangeMap[historyRange] || 180;
         const cutoff = daysAgo(days);
-
+        
         const filteredWorkouts = workouts.filter(w => new Date(w['Date']) >= cutoff);
         const filteredDaily = daily.filter(d => new Date(d['Date']) >= cutoff);
-
+        
         const totalKm = filteredWorkouts.reduce((s, w) => s + (parseFloat(w['Distance (km)']) || 0), 0);
         const totalMins = filteredWorkouts.reduce((s, w) => s + (parseFloat(w['Duration (min)']) || 0), 0);
         const sessions = filteredWorkouts.length;
-
+        
         const vo2Values = filteredDaily.map(d => parseFloat(d['VO2 Max'])).filter(Boolean);
         const vo2Start = vo2Values[0];
         const vo2End = vo2Values[vo2Values.length - 1];
         const vo2Change = vo2Start && vo2End ? vo2End - vo2Start : 0;
-
-        // Type-filtered workouts for the log
-        const typeFilteredWorkouts = historyFilter === 'All'
-            ? filteredWorkouts
-            : historyFilter === 'Running'
-                ? filteredWorkouts.filter(w => (w['Workout Type'] || '').toLowerCase().includes('running'))
-                : historyFilter === 'Strength'
-                    ? filteredWorkouts.filter(w => (w['Workout Type'] || '').toLowerCase().includes('strength'))
-                    : filteredWorkouts.filter(w => {
-                        const t = (w['Workout Type'] || '').toLowerCase();
-                        return !t.includes('running') && !t.includes('strength');
-                    });
-
-        const sortedFiltered = [...typeFilteredWorkouts].sort((a, b) => new Date(b['Date']) - new Date(a['Date']));
-
+        
         return (
             <div className="container hide-scrollbar">
                 <div className="px-5 py-4">
                     <h1 style={{ fontSize: 28, fontWeight: 600 }}>History</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Your training journey</p>
                 </div>
-
+                
                 <div className="px-5 mb-4">
                     <TimeToggle value={historyRange} onChange={setHistoryRange} options={['3M', '6M', 'Y', 'All']} />
                 </div>
-
+                
                 {/* Summary Stats */}
                 <div className="px-5 mb-4 fade-up">
                     <p className="label" style={{ marginBottom: 12 }}>PERIOD SUMMARY</p>
@@ -2569,11 +2538,11 @@ function App() {
                         <StatBox label="Total Volume" value={totalKm.toFixed(0)} unit=" km" />
                         <StatBox label="Training Time" value={Math.round(totalMins / 60)} unit=" hrs" />
                         <StatBox label="Sessions" value={sessions} />
-                        <StatBox label="VO₂ Change" value={vo2Change > 0 ? `+${vo2Change.toFixed(1)}` : vo2Change.toFixed(1)}
+                        <StatBox label="VO₂ Change" value={vo2Change > 0 ? `+${vo2Change.toFixed(1)}` : vo2Change.toFixed(1)} 
                             positive={vo2Change > 0} />
                     </div>
                 </div>
-
+                
                 {/* VO2max Chart */}
                 <div className="px-5 mb-4 fade-up delay-1">
                     <div className="card" style={{ padding: 20 }}>
@@ -2588,7 +2557,7 @@ function App() {
                         <LineChart data={vo2Values} color="var(--green)" height={180} />
                     </div>
                 </div>
-
+                
                 {/* Weekly Volume Chart */}
                 <div className="px-5 mb-4 fade-up delay-2">
                     <div className="card" style={{ padding: 20 }}>
@@ -2596,91 +2565,29 @@ function App() {
                         <BarChart data={historyData.volHistory} color="var(--blue)" height={100} />
                     </div>
                 </div>
-
-                {/* Workout Log with Type Filter */}
-                <div className="px-5 mb-4 fade-up delay-3">
-                    <p className="label" style={{ marginBottom: 12 }}>WORKOUT LOG</p>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 16, overflowX: 'auto' }} className="hide-scrollbar">
-                        {['All', 'Running', 'Strength', 'Other'].map(f => (
-                            <button key={f} onClick={() => setHistoryFilter(f)} style={{
-                                padding: '8px 16px', borderRadius: 20, border: 'none',
-                                background: historyFilter === f ? 'var(--blue)' : 'var(--card-elevated)',
-                                color: historyFilter === f ? 'white' : 'var(--text-secondary)',
-                                fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap'
-                            }}>{f}</button>
-                        ))}
-                    </div>
-
-                    {sortedFiltered.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-tertiary)' }}>
-                            <p>No {historyFilter !== 'All' ? historyFilter.toLowerCase() + ' ' : ''}workouts in this period</p>
-                        </div>
-                    ) : (
-                        sortedFiltered.slice(0, 50).map((w, i) => {
-                            const dist = parseFloat(w['Distance (km)']) || 0;
-                            const dur = parseFloat(w['Duration (min)']) || 0;
-                            const hr = parseFloat(w['Avg HR']) || 0;
-                            const pace = parseFloat(w['Avg Pace (sec/km)']) || 0;
-                            const wDate = new Date(w['Date']);
-                            const dateLabel = wDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
-
-                            return (
-                                <div key={i} style={{
-                                    padding: '14px 16px',
-                                    background: 'var(--card)',
-                                    border: '1px solid var(--border)',
-                                    borderRadius: 14,
-                                    marginBottom: 8
-                                }}>
-                                    <div className="flex flex-between flex-center">
-                                        <div>
-                                            <p style={{ fontWeight: 500, fontSize: 15 }}>{w['Workout Type'] || 'Workout'}</p>
-                                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{dateLabel}</p>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                            <p style={{ fontWeight: 600, fontSize: 15, color: dist > 0 ? 'var(--blue)' : 'var(--cyan)' }}>
-                                                {dist > 0 ? `${dist.toFixed(1)} km` : fmt.duration(dur)}
-                                            </p>
-                                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 2 }}>
-                                                {dist > 0 && dur > 0 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
-                                                {pace > 0 && pace < 600 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
-                                                {hr > 0 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(hr)} bpm</span>}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })
-                    )}
-                    {sortedFiltered.length > 50 && (
-                        <p style={{ textAlign: 'center', fontSize: 13, color: 'var(--text-tertiary)', marginTop: 12 }}>
-                            Showing 50 of {sortedFiltered.length} workouts
-                        </p>
-                    )}
-                </div>
-
+                
                 {/* Insights */}
                 {totalKm > 100 && (
-                    <div className="px-5 fade-up delay-4">
+                    <div className="px-5 fade-up delay-3">
                         <p className="label" style={{ marginBottom: 12 }}>KEY INSIGHTS</p>
-
+                        
                         {vo2Change > 1 && (
-                            <InsightBox
-                                title="VO₂max is growing"
+                            <InsightBox 
+                                title="VO₂max is growing" 
                                 text={`+${vo2Change.toFixed(1)} increase. Your aerobic base is developing well.`}
                                 color="green"
                             />
                         )}
-
+                        
                         {totalKm / (days / 7) >= 30 ? (
-                            <InsightBox
-                                title="Strong volume consistency"
+                            <InsightBox 
+                                title="Strong volume consistency" 
                                 text={`Averaging ${(totalKm / (days / 7)).toFixed(0)}km/week. This consistency drives adaptation.`}
                                 color="green"
                             />
                         ) : (
-                            <InsightBox
-                                title="Volume opportunity"
+                            <InsightBox 
+                                title="Volume opportunity" 
                                 text={`Averaging ${(totalKm / (days / 7)).toFixed(0)}km/week. Building to 40-50km would accelerate progress.`}
                                 color="orange"
                             />
@@ -2744,7 +2651,7 @@ function App() {
             {modal?.type === 'hyroxReady' && (
                 <HyroxReadyModal 
                     data={hyroxReady}
-                    history={tests.miniSim || []}
+                    history={tests.miniSim}
                     onClose={() => setModal(null)}
                     onLogTest={(t) => { setModal(null); setTestModal(t); }}
                 />
