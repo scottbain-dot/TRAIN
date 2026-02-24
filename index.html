@@ -583,6 +583,7 @@
     <div id="app"></div>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script>window.onerror = function(msg, url, line, col, err) { document.getElementById('app').innerHTML = '<div style="padding:40px;font:14px monospace;color:#D93025"><h2>Script Error</h2><pre>' + msg + '\nLine: ' + line + ' Col: ' + col + '\n' + (err?.stack || '') + '</pre></div>'; };</script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script type="text/babel">
 const { useState, useEffect, useMemo } = React;
@@ -772,7 +773,6 @@ const fetchSheet = async (sheetId, tabName) => {
                             byDate[d][h] = val;
                         }
                     }
-                });
                 });
             });
             
@@ -3028,7 +3028,22 @@ function App() {
     );
 }
 
-ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+// Error boundary to catch render crashes
+class ErrorBoundary extends React.Component {
+    constructor(props) { super(props); this.state = { error: null }; }
+    static getDerivedStateFromError(error) { return { error }; }
+    render() {
+        if (this.state.error) return (
+            <div style={{ padding: 40, fontFamily: 'monospace', fontSize: 14, color: '#D93025', background: '#FFF', minHeight: '100vh' }}>
+                <h2 style={{ marginBottom: 16 }}>HYROX ENGINE — Render Error</h2>
+                <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{this.state.error.message}{'\n'}{this.state.error.stack}</pre>
+            </div>
+        );
+        return this.props.children;
+    }
+}
+
+ReactDOM.createRoot(document.getElementById('app')).render(<ErrorBoundary><App /></ErrorBoundary>);
     </script>
 </body>
 </html>
