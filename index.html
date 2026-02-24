@@ -611,8 +611,32 @@ const CONFIG = {
         plan: { sheetId: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc', tabs: { weeklyPlan: 'WeeklyPlan', strengthA: 'StrengthA', strengthB: 'StrengthB' } }
     },
     targets: { vo2max: 48, twoKm: 465, threshold: 255, weeklyKm: 50, raceTime: 3900 },
-    baselines: { vo2max: 43.5, twoKm: 540, threshold: 285 },
-    profile: { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15', raceName: 'Malaga' }
+    baselines: { vo2max: 43.5, twoKm: 540, threshold: 285, restingHR: 55 },
+    profile: { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15', raceName: 'Malaga', age: 42 },
+    
+    // ═══ HEART RATE ZONES ═══
+    // Based on actual observed max HR of 183 (from HYROX race data)
+    // Zones use % of max HR — standard 5-zone model
+    maxHR: 183,
+    hrZones: {
+        z1: { name: 'Recovery',   min: 0,   max: 0.60, color: 'var(--text-tertiary)', label: 'Z1' },  // <110
+        z2: { name: 'Aerobic',    min: 0.60, max: 0.76, color: 'var(--green)',         label: 'Z2' },  // 110-139
+        z3: { name: 'Tempo',      min: 0.76, max: 0.87, color: 'var(--blue)',          label: 'Z3' },  // 139-159
+        z4: { name: 'Threshold',  min: 0.87, max: 0.93, color: 'var(--orange)',        label: 'Z4' },  // 159-170
+        z5: { name: 'VO₂max',     min: 0.93, max: 1.00, color: 'var(--red)',           label: 'Z5' },  // 170-183
+    },
+    // Polarized targets: 80/0/20 (Z1-2 / Z3 / Z4-5)
+    polarizedTarget: { easy: 80, tempo: 0, hard: 20 },
+    
+    // Session-specific HR targets
+    sessionHR: {
+        z2Stepper:    { target: 133, range: [127, 140], note: 'Steady state. Should feel easy. Can hold a conversation.' },
+        z2Run:        { target: 140, range: [133, 145], note: 'Easy effort. Nasal breathing. Build aerobic base.' },
+        threshold:    { target: 165, range: [159, 172], note: 'Comfortably hard. Race pace effort.' },
+        vo2max:       { target: 175, range: [170, 183], note: 'Hard intervals. Max sustainable for 3-5 min.' },
+        compromised:  { target: 162, range: [155, 175], note: '1km repeats + stations. Avg will be lower due to transitions.' },
+        strength:     { target: null, range: [100, 150], note: 'Variable. Spikes on power moves, drops on rest.' },
+    }
 };
 
 // ============================================
@@ -645,6 +669,294 @@ const math = {
         return Math.sqrt(arr.reduce((s, v) => s + Math.pow(v - m, 2), 0) / arr.length);
     },
     clamp: (n, min, max) => Math.min(Math.max(n, min), max)
+};
+
+// ============================================
+// HEART RATE ZONE ENGINE
+// ============================================
+const hrEngine = {
+    // Classify a single HR value into a zone (1-5)
+    classify: (hr) => {
+        if (!hr || hr <= 0) return null;
+        const pct = hr / CONFIG.maxHR;
+        if (pct >= CONFIG.hrZones.z5.min) return 5;
+        if (pct >= CONFIG.hrZones.z4.min) return 4;
+        if (pct >= CONFIG.hrZones.z3.min) return 3;
+        if (pct >= CONFIG.hrZones.z2.min) return 2;
+        return 1;
+    },
+    
+    // Get zone config for a zone number
+    zone: (n) => CONFIG.hrZones[`z${n}`] || CONFIG.hrZones.z1,
+    
+    // Get HR range for a zone number
+    range: (n) => {
+        const z = CONFIG.hrZones[`z${n}`];
+        return z ? [Math.round(z.min * CONFIG.maxHR), Math.round(z.max * CONFIG.maxHR)] : [0, 0];
+    },
+    
+    // Classify a workout by Avg HR and type
+    classifyWorkout: (workout) => {
+        const type = (workout['Workout Type'] || '').toLowerCase();
+        const avgHR = parseFloat(workout['Avg HR']) || 0;
+        const dur = parseFloat(workout['Duration (min)']) || 0;
+        
+        // Skip walks and very short sessions
+        if (type.includes('walk') && dur < 25) return { zone: 1, category: 'walk' };
+        if (dur < 3) return { zone: 1, category: 'micro' };
+        
+        // Strength sessions — separate category
+        if (type.includes('strength') || type.includes('functional') || type.includes('traditional')) {
+            return { zone: 'str', category: 'strength', avgHR };
+        }
+        
+        // Cardio — classify by HR
+        if (avgHR > 0) {
+            const zone = hrEngine.classify(avgHR);
+            return { zone, category: 'cardio', avgHR };
+        }
+        
+        // No HR — estimate from type
+        if (type.includes('stair') || type.includes('stepper') || type.includes('elliptical')) return { zone: 2, category: 'cardio', estimated: true };
+        if (type.includes('run') || type.includes('jog')) return { zone: 3, category: 'cardio', estimated: true };
+        if (type.includes('row')) return { zone: 3, category: 'cardio', estimated: true };
+        if (type.includes('cross')) return { zone: 3, category: 'cardio', estimated: true };
+        return { zone: 2, category: 'other', estimated: true };
+    },
+    
+    // Compute TRIMP (Training Impulse) for a workout
+    // Banister TRIMP = duration × ΔHR × 0.64e^(1.92×ΔHR) where ΔHR = (avgHR - restHR) / (maxHR - restHR)
+    trimp: (workout, restHR) => {
+        const dur = parseFloat(workout['Duration (min)']) || 0;
+        const avgHR = parseFloat(workout['Avg HR']) || 0;
+        const rhr = restHR || CONFIG.baselines?.restingHR || 55;
+        if (dur <= 0) return 0;
+        if (avgHR <= 0) return dur * 0.4; // No HR: assume light effort
+        
+        // Banister TRIMP (male formula: b = 1.92)
+        const deltaHR = (avgHR - rhr) / (CONFIG.maxHR - rhr);
+        const clampedDelta = Math.max(0, Math.min(1, deltaHR));
+        return dur * clampedDelta * 0.64 * Math.exp(1.92 * clampedDelta);
+    },
+    
+    // Compute weekly zone distribution from an array of workouts
+    weeklyZones: (workouts) => {
+        const zones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, str: 0 };
+        const details = [];
+        
+        workouts.forEach(w => {
+            const dur = parseFloat(w['Duration (min)']) || 0;
+            if (dur <= 0) return;
+            
+            const classified = hrEngine.classifyWorkout(w);
+            if (classified.zone === 'str') {
+                zones.str += dur;
+            } else if (classified.zone >= 1 && classified.zone <= 5) {
+                zones[`z${classified.zone}`] += dur;
+            }
+            details.push({ ...classified, dur, type: w['Workout Type'], date: w['Date'] });
+        });
+        
+        const totalCardio = zones.z1 + zones.z2 + zones.z3 + zones.z4 + zones.z5;
+        const easyMins = zones.z1 + zones.z2;
+        const tempoMins = zones.z3;
+        const hardMins = zones.z4 + zones.z5;
+        
+        return {
+            zones,
+            totalCardio,
+            totalAll: totalCardio + zones.str,
+            easy: { mins: easyMins, pct: totalCardio > 0 ? easyMins / totalCardio * 100 : 0 },
+            tempo: { mins: tempoMins, pct: totalCardio > 0 ? tempoMins / totalCardio * 100 : 0 },
+            hard: { mins: hardMins, pct: totalCardio > 0 ? hardMins / totalCardio * 100 : 0 },
+            isPolarized: totalCardio > 0 && (easyMins / totalCardio * 100) >= 70,
+            details
+        };
+    },
+    
+    // Get HR targets for today's planned session
+    sessionTargets: (sessionType) => {
+        const t = sessionType.toLowerCase();
+        if (t.includes('z2') || t.includes('easy') || t.includes('long')) {
+            return t.includes('stepper') || t.includes('stair') ? CONFIG.sessionHR.z2Stepper : CONFIG.sessionHR.z2Run;
+        }
+        if (t.includes('threshold') || t.includes('tempo')) return CONFIG.sessionHR.threshold;
+        if (t.includes('vo₂') || t.includes('vo2') || t.includes('interval')) return CONFIG.sessionHR.vo2max;
+        if (t.includes('compromised')) return CONFIG.sessionHR.compromised;
+        if (t.includes('strength')) return CONFIG.sessionHR.strength;
+        return null;
+    },
+    
+    // Compute Acute:Chronic Training Load ratio (fatigue vs fitness)
+    // Acute = 7-day TRIMP avg, Chronic = 28-day TRIMP avg
+    acwr: (workouts, restHR) => {
+        const today = new Date();
+        const acute7 = workouts
+            .filter(w => new Date(w['Date']) >= new Date(today.getTime() - 7 * 86400000))
+            .reduce((s, w) => s + hrEngine.trimp(w, restHR), 0) / 7;
+        const chronic28 = workouts
+            .filter(w => new Date(w['Date']) >= new Date(today.getTime() - 28 * 86400000))
+            .reduce((s, w) => s + hrEngine.trimp(w, restHR), 0) / 28;
+        
+        const ratio = chronic28 > 0 ? acute7 / chronic28 : 1;
+        let status = 'optimal';
+        if (ratio > 1.5) status = 'danger';      // Injury risk
+        else if (ratio > 1.3) status = 'overreach'; // Hard week
+        else if (ratio < 0.7) status = 'detraining'; // Too easy
+        
+        return { acute: acute7, chronic: chronic28, ratio, status };
+    },
+    
+    // Cardiac drift detection: compare first vs second half of long Z2 sessions
+    // If HR drifts >5% at same pace, aerobic base needs work
+    driftCheck: (recentWorkouts) => {
+        // We only have avg HR per session, not split data
+        // But we can compare Z2 session avg HR over time to detect improvement
+        const z2Sessions = recentWorkouts
+            .filter(w => {
+                const c = hrEngine.classifyWorkout(w);
+                return c.zone === 2 && c.category === 'cardio' && !c.estimated;
+            })
+            .sort((a, b) => new Date(a['Date']) - new Date(b['Date']));
+        
+        if (z2Sessions.length < 4) return null;
+        
+        const recent = z2Sessions.slice(-4);
+        const older = z2Sessions.slice(0, Math.min(4, z2Sessions.length - 4));
+        
+        if (older.length === 0) return null;
+        
+        const recentAvgHR = math.mean(recent.map(w => parseFloat(w['Avg HR'])));
+        const olderAvgHR = math.mean(older.map(w => parseFloat(w['Avg HR'])));
+        const drift = ((recentAvgHR - olderAvgHR) / olderAvgHR) * 100;
+        
+        return {
+            recentAvgHR: Math.round(recentAvgHR),
+            olderAvgHR: Math.round(olderAvgHR),
+            drift: drift.toFixed(1),
+            improving: drift < -2,  // Lower HR at same effort = fitter
+            concern: drift > 5      // Rising HR = fatigue or detraining
+        };
+    },
+    
+    // ═══ PACE:HR COUPLING (Aerobic Decoupling) ═══
+    // Compare pace vs HR across running sessions to track aerobic efficiency
+    // Lower HR at same pace = fitter. Rising HR at same pace = fatigued or detrained.
+    paceHRCoupling: (workouts) => {
+        const runs = workouts
+            .filter(w => {
+                const type = (w['Workout Type'] || '').toLowerCase();
+                const dist = parseFloat(w['Distance (km)']) || 0;
+                const hr = parseFloat(w['Avg HR']) || 0;
+                const dur = parseFloat(w['Duration (min)']) || 0;
+                // Only include real running sessions with pace & HR data
+                return (type.includes('run') || type.includes('jog')) && dist > 1 && hr > 0 && dur > 10;
+            })
+            .map(w => ({
+                date: w['Date'],
+                pace: (parseFloat(w['Duration (min)']) || 0) / (parseFloat(w['Distance (km)']) || 1), // min/km
+                hr: parseFloat(w['Avg HR']),
+                dist: parseFloat(w['Distance (km)']),
+                type: w['Workout Type']
+            }))
+            .sort((a, b) => new Date(a.date) - new Date(b.date));
+        
+        if (runs.length < 3) return null;
+        
+        // Efficiency index: pace / HR (lower = better: faster pace at lower HR)
+        // Normalize to bpm per min/km
+        const efficiencies = runs.map(r => ({
+            ...r,
+            efficiency: r.hr / r.pace, // bpm per min/km — lower is better for Z2
+            hrPerKm: r.hr * r.pace      // HR × pace product — lower is more efficient
+        }));
+        
+        // Recent vs older comparison
+        const recentN = Math.min(3, Math.floor(runs.length / 2));
+        const recent = efficiencies.slice(-recentN);
+        const older = efficiencies.slice(0, recentN);
+        
+        const recentAvgEff = math.mean(recent.map(r => r.hrPerKm));
+        const olderAvgEff = math.mean(older.map(r => r.hrPerKm));
+        const change = olderAvgEff > 0 ? ((recentAvgEff - olderAvgEff) / olderAvgEff) * 100 : 0;
+        
+        return {
+            runs: efficiencies,
+            recentAvg: { pace: math.mean(recent.map(r => r.pace)), hr: Math.round(math.mean(recent.map(r => r.hr))) },
+            olderAvg: { pace: math.mean(older.map(r => r.pace)), hr: Math.round(math.mean(older.map(r => r.hr))) },
+            change: change.toFixed(1),
+            improving: change < -3, // Lower HR×pace product = more efficient
+            concern: change > 5
+        };
+    },
+    
+    // ═══ WEEKLY ZONE TREND (last 4 weeks) ═══
+    // Track polarization compliance over time
+    weeklyZoneTrend: (workouts) => {
+        const now = new Date();
+        const weeks = [];
+        for (let w = 0; w < 4; w++) {
+            const wStart = new Date(now.getTime() - (w + 1) * 7 * 86400000);
+            const wEnd = new Date(now.getTime() - w * 7 * 86400000);
+            const wWorkouts = workouts.filter(wo => {
+                const d = new Date(wo['Date']);
+                return d >= wStart && d < wEnd;
+            });
+            const zones = hrEngine.weeklyZones(wWorkouts);
+            weeks.unshift({
+                label: w === 0 ? 'This wk' : w === 1 ? 'Last wk' : `${w}wk ago`,
+                ...zones,
+                trimp: wWorkouts.reduce((s, wo) => s + hrEngine.trimp(wo), 0)
+            });
+        }
+        return weeks;
+    },
+    
+    // ═══ SESSION RECOMMENDATION based on readiness + training history ═══
+    // Uses HRV, RHR, sleep, and recent training load to suggest intensity
+    sessionRecommendation: (readinessScore, acwr, yesterdayZone) => {
+        // High readiness (80+) + optimal/low ACWR = go hard
+        // Low readiness (<60) or high ACWR (>1.3) = easy day
+        // Medium readiness + rest yesterday = moderate-hard OK
+        
+        if (readinessScore >= 80 && (!acwr || acwr.ratio <= 1.2)) {
+            if (yesterdayZone === 'str' || yesterdayZone === 1 || !yesterdayZone) {
+                return { intensity: 'high', msg: 'Body is primed. Great day for threshold or VO₂max work.', color: 'red' };
+            }
+            return { intensity: 'moderate', msg: 'Good readiness but trained hard recently. Z2 or moderate strength.', color: 'blue' };
+        }
+        
+        if (readinessScore < 55 || (acwr && acwr.ratio > 1.4)) {
+            return { intensity: 'recovery', msg: 'Recovery day recommended. Walk, mobility, or complete rest.', color: 'green' };
+        }
+        
+        if (readinessScore < 70 || (acwr && acwr.ratio > 1.3)) {
+            return { intensity: 'easy', msg: 'Keep it easy today. Z2 aerobic or light strength.', color: 'green' };
+        }
+        
+        return { intensity: 'moderate', msg: 'Moderate day. Follow your plan — body can handle it.', color: 'blue' };
+    },
+    
+    // ═══ HR RECOVERY QUALITY ═══
+    // Compare Max HR vs Avg HR — bigger gap in strength = good recovery between sets
+    // Closer Max/Avg in cardio = more sustained effort
+    recoveryQuality: (workout) => {
+        const maxHR = parseFloat(workout['Max HR']) || 0;
+        const avgHR = parseFloat(workout['Avg HR']) || 0;
+        if (maxHR <= 0 || avgHR <= 0) return null;
+        
+        const spread = maxHR - avgHR;
+        const ratio = avgHR / maxHR;
+        
+        return {
+            spread,
+            ratio: ratio.toFixed(2),
+            // For cardio: ratio > 0.9 = very sustained, 0.8-0.9 = intervals, < 0.8 = varied
+            // For strength: ratio < 0.8 is normal (spikes on sets, drops on rest)
+            sustained: ratio > 0.88,
+            interval: ratio >= 0.78 && ratio <= 0.88
+        };
+    }
 };
 
 // ============================================
@@ -694,7 +1006,21 @@ const fetchSheet = async (sheetId, tabName) => {
                             obj[headers[i]] = v || null;
                         }
                     } else {
-                        obj[headers[i]] = cell?.v ?? cell?.f ?? null;
+                        // gviz returns time/duration values as "Date(1899,11,30,H,M,S)" in cell.v
+                        // For these, prefer cell.f (formatted string like "0:50:05") which our parsers handle
+                        const cv = cell?.v;
+                        const cf = cell?.f;
+                        if (typeof cv === 'string' && cv.startsWith('Date(')) {
+                            // Extract H,M,S from Date(1899,11,30,H,M,S) for time/duration fields
+                            const tm = cv.match(/Date\(\d+,\d+,\d+,(\d+),(\d+),(\d+)\)/);
+                            if (tm) {
+                                obj[headers[i]] = `${tm[1]}:${String(tm[2]).padStart(2,'0')}:${String(tm[3]).padStart(2,'0')}`;
+                            } else {
+                                obj[headers[i]] = cf || cv || null;
+                            }
+                        } else {
+                            obj[headers[i]] = cv ?? cf ?? null;
+                        }
                     }
                 }
             });
@@ -704,14 +1030,32 @@ const fetchSheet = async (sheetId, tabName) => {
         // ═══ MAP Health Auto Export workout columns to app format ═══
         if (headers.includes('Type') && headers.includes('Start') && !headers.includes('Workout Type')) {
             rawData = rawData.map(w => {
-                // Duration: "0:50:05" → minutes
+                // Duration: gviz returns time values as fraction of a day (0.03478 = 50min)
+                // OR as formatted string "0:50:05" — handle both
                 let durMin = 0;
-                const durStr = w['Duration'] || '';
-                if (durStr) {
-                    const parts = durStr.toString().split(':');
-                    if (parts.length === 3) durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]) + parseInt(parts[2]) / 60;
-                    else if (parts.length === 2) durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
-                    else durMin = parseFloat(durStr) || 0;
+                const durRaw = w['Duration'];
+                if (durRaw != null) {
+                    const durStr = durRaw.toString();
+                    const parts = durStr.split(':');
+                    if (parts.length === 3) {
+                        // "H:MM:SS" format
+                        durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]) + parseInt(parts[2]) / 60;
+                    } else if (parts.length === 2) {
+                        // "H:MM" format
+                        durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                    } else {
+                        const num = parseFloat(durStr) || 0;
+                        if (num > 0 && num < 1) {
+                            // Fraction of a day from gviz (0.03478 = ~50 min)
+                            durMin = num * 24 * 60;
+                        } else if (num > 1 && num < 10) {
+                            // Likely hours as decimal (1.5 = 90 min)
+                            durMin = num * 60;
+                        } else {
+                            // Already in minutes or unknown
+                            durMin = num;
+                        }
+                    }
                 }
                 
                 // Energy: kJ → kcal (÷ 4.184)
@@ -1280,6 +1624,8 @@ const SessionCard = ({ session, isToday, onClick }) => {
         : session.modality === 'bike' ? '🚴' : session.modality === 'gym' ? '💪' 
         : session.modality === 'swim' ? '🏊' : '';
     
+    const hrT = session.hrTargets;
+    
     return (
         <div className={`card session-card aurora grad-session`} onClick={onClick} 
             style={{ border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)' }}>
@@ -1296,6 +1642,30 @@ const SessionCard = ({ session, isToday, onClick }) => {
             <p className="insight" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
                 {session.purpose?.split('.')[0]}
             </p>
+            {/* HR Target guidance — prominent for cardio sessions */}
+            {isToday && hrT && hrT.target && (
+                <div style={{ marginTop: 10, padding: '8px 12px', borderRadius: 10, 
+                    background: session.zone === 2 ? 'rgba(52,199,89,0.08)' : session.zone >= 4 ? 'rgba(255,59,48,0.08)' : 'rgba(0,122,255,0.08)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: 0.3 }}>HR TARGET</p>
+                        <p style={{ fontSize: 18, fontWeight: 700, color: session.zone === 2 ? 'var(--green)' : session.zone >= 4 ? 'var(--red)' : 'var(--blue)' }}>
+                            {hrT.target} <span style={{ fontSize: 12, fontWeight: 400 }}>bpm</span>
+                        </p>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Range: {hrT.range[0]}–{hrT.range[1]}</p>
+                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{hrT.note?.split('.')[0]}</p>
+                    </div>
+                </div>
+            )}
+            {isToday && hrT && !hrT.target && hrT.range && (
+                <div style={{ marginTop: 10, padding: '6px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                        💓 HR will vary: {hrT.range[0]}–{hrT.range[1]} bpm · {hrT.note?.split('.')[0]}
+                    </p>
+                </div>
+            )}
         </div>
     );
 };
@@ -1666,6 +2036,26 @@ const SessionModal = ({ session, onClose }) => (
                     <p className="insight">{session.purpose}</p>
                 </div>
                 
+                {/* HR Coaching Card */}
+                {session.hrTargets && (
+                    <div style={{ padding: 16, background: session.zone === 2 ? 'var(--green-dim)' : session.zone === 4 ? 'var(--orange-dim)' : session.zone === 5 ? 'var(--red-dim)' : 'rgba(0,0,0,0.03)', borderRadius: 14, marginBottom: 24 }}>
+                        <div className="flex flex-between flex-center" style={{ marginBottom: 8 }}>
+                            <p style={{ fontWeight: 600, fontSize: 13 }}>❤️ Heart Rate Guide</p>
+                            {session.hrTargets.target && (
+                                <span style={{ fontSize: 20, fontWeight: 700, color: session.zone === 2 ? 'var(--green)' : session.zone === 4 ? 'var(--orange)' : session.zone === 5 ? 'var(--red)' : 'var(--text)' }}>
+                                    {session.hrTargets.target} bpm
+                                </span>
+                            )}
+                        </div>
+                        {session.hrTargets.range && (
+                            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                Stay in range: <strong>{session.hrTargets.range[0]}–{session.hrTargets.range[1]} bpm</strong>
+                            </p>
+                        )}
+                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{session.hrTargets.note}</p>
+                    </div>
+                )}
+                
                 {session.structure && (
                     <div className="modal-section">
                         <p className="label" style={{ marginBottom: 12 }}>SESSION STRUCTURE</p>
@@ -1982,7 +2372,7 @@ function App() {
             ]);
             setWorkouts(w);
             console.log('[Data Load]', { workouts: w.length, daily: d.length, weeklyPlan: wp.length, strengthA: sa.length, strengthB: sb.length });
-            if (w.length > 0) console.log('[Workout Sample]', { date: w[0]['Date'], type: w[0]['Workout Type'], dist: w[0]['Distance (km)'], dur: w[0]['Duration (min)'] });
+            if (w.length > 0) console.log('[Workout Sample]', { date: w[0]['Date'], type: w[0]['Workout Type'], dist: w[0]['Distance (km)'], dur: w[0]['Duration (min)'], avgHR: w[0]['Avg HR'], maxHR: w[0]['Max HR'], cal: w[0]['Calories'] });
             setDaily(d);
             setPlanData({ weekly: wp, strengthA: sa, strengthB: sb });
             setLoading(false);
@@ -2383,29 +2773,44 @@ function App() {
             if (avgPrior > 0) hrvTrend3d = ((avg3 - avgPrior) / avgPrior) * 100;
         }
         
-        // ═══ TRIMP-based Training Load ═══
-        // TRIMP = duration_mins × (avgHR / maxHR)
-        // maxHR estimated as 220 - age (42) = 178
-        const maxHR = 178;
-        const calcTrimp = (workout) => {
-            const dur = parseFloat(workout['Duration (min)']) || 0;
-            const avgHR = parseFloat(workout['Avg HR']) || 0;
-            if (dur <= 0) return 0;
-            if (avgHR <= 0) return dur * 0.5; // No HR data: assume moderate effort
-            return dur * (avgHR / maxHR);
-        };
-        
-        // Yesterday's TRIMP
+        // ═══ Training Load (using hrEngine) ═══
+        const rhr = restingHR || 55; // Use today's RHR for TRIMP calculations
         const yesterday = daysAgo(1).toISOString().split('T')[0];
         const yesterdayWorkouts = workouts.filter(w => w['Date'] === yesterday);
-        const trimpYesterday = yesterdayWorkouts.reduce((s, w) => s + calcTrimp(w), 0);
+        const trimpYesterday = yesterdayWorkouts.reduce((s, w) => s + hrEngine.trimp(w, rhr), 0);
         
-        // 7-day rolling average TRIMP per day
         const last7Workouts = workouts.filter(w => new Date(w['Date']) >= last7);
-        const trimpLast7 = last7Workouts.reduce((s, w) => s + calcTrimp(w), 0);
+        const trimpLast7 = last7Workouts.reduce((s, w) => s + hrEngine.trimp(w, rhr), 0);
         const trimpAvg7 = trimpLast7 / 7;
         
+        // ACWR — Acute:Chronic Workload Ratio
+        const acwr = hrEngine.acwr(workouts, rhr);
+        
+        // Weekly zone distribution
+        const weekWorkoutsFull = workouts.filter(w => new Date(w['Date']) >= last7);
+        const weekZones = hrEngine.weeklyZones(weekWorkoutsFull);
+        
+        // Cardiac efficiency trend (Z2 HR over time)
+        const driftCheck = hrEngine.driftCheck(workouts);
+        
+        // Pace:HR coupling trend (aerobic decoupling)
+        const paceHR = hrEngine.paceHRCoupling(workouts);
+        
+        // Weekly zone trends (last 4 weeks)
+        const zoneTrend = hrEngine.weeklyZoneTrend(workouts);
+        
+        // Today's session HR targets
+        const todaySession = getWeekPlan()?.[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
+        const sessionHRTargets = todaySession ? hrEngine.sessionTargets(todaySession.type) : null;
+        
+        // Yesterday's primary zone for recovery recommendation
+        const yesterdayZone = yesterdayWorkouts.length > 0 
+            ? hrEngine.classifyWorkout(yesterdayWorkouts.reduce((a, b) => (parseFloat(a['Duration (min)']) || 0) > (parseFloat(b['Duration (min)']) || 0) ? a : b)).zone 
+            : null;
+        
         console.log('[TRIMP Debug]', { trimpYesterday: trimpYesterday.toFixed(1), trimpAvg7: trimpAvg7.toFixed(1), yesterdayWorkoutCount: yesterdayWorkouts.length, last7WorkoutCount: last7Workouts.length });
+        console.log('[ACWR Debug]', { acute: acwr.acute.toFixed(1), chronic: acwr.chronic.toFixed(1), ratio: acwr.ratio.toFixed(2), status: acwr.status });
+        console.log('[Zone Distribution]', { easy: `${weekZones.easy.pct.toFixed(0)}%`, tempo: `${weekZones.tempo.pct.toFixed(0)}%`, hard: `${weekZones.hard.pct.toFixed(0)}%`, polarized: weekZones.isPolarized, totalCardioMin: Math.round(weekZones.totalCardio) });
         console.log('[HRV Balance Debug]', { hrvAvg14: hrvAvg14.toFixed(1), hrvBaseline60: hrvBaseline60.toFixed(1), hrvTrend3d: hrvTrend3d.toFixed(1), hrv14Count: hrv14.length, hrv60Count: hrv60.length });
         
         // VO2 and volume history
@@ -2434,10 +2839,17 @@ function App() {
         };
         
         return {
-            workoutStats: { weeklyKm, weeklyMins, weekWorkouts },
+            workoutStats: { weeklyKm, weeklyMins, weekWorkouts: weekWorkoutsFull },
             latestDaily: { restingHR: restingHR || 0, hrv: hrv || 0, sleep: sleep || 0, vo2max },
             readinessInput: { restingHR, hrv, sleep, hrAvg7, hrvAvg7, hrvAvg14, hrvBaseline60, hrvTrend3d, trimpYesterday, trimpAvg7 },
             aerobicInput: { vo2max, weeklyKm, weeklyMins, vo2History, volHistory },
+            weekZones,
+            acwr,
+            driftCheck,
+            paceHR,
+            zoneTrend,
+            yesterdayZone,
+            sessionHRTargets,
             raceInput: { 
                 twoKm: latestTests.twoKm?.time || 0, 
                 threshold: latestTests.threshold?.pace || 0, 
@@ -2467,6 +2879,30 @@ function App() {
     
     // Today's session
     const todaySession = weekPlan.find(s => s.day === todayName) || weekPlan[0];
+    
+    // Enrich today's session with HR targets from the engine
+    if (todaySession && !todaySession.hrTargets) {
+        const hrT = hrEngine.sessionTargets(todaySession.type || '');
+        if (hrT) {
+            todaySession.hrTargets = hrT;
+            if (!todaySession.targets) todaySession.targets = {};
+            if (hrT.target) todaySession.targets['HR Target'] = `${hrT.target} bpm (${hrT.range[0]}-${hrT.range[1]})`;
+            else if (hrT.range) todaySession.targets['HR Range'] = `${hrT.range[0]}-${hrT.range[1]} bpm`;
+        }
+    }
+    
+    // Enrich all plan sessions with HR targets
+    weekPlan.forEach(s => {
+        if (s && !s.hrTargets) {
+            const hrT = hrEngine.sessionTargets(s.type || '');
+            if (hrT) {
+                s.hrTargets = hrT;
+                if (!s.targets) s.targets = {};
+                if (hrT.target) s.targets['HR Target'] = `${hrT.target} bpm (${hrT.range[0]}-${hrT.range[1]})`;
+                else if (hrT.range) s.targets['HR Range'] = `${hrT.range[0]}-${hrT.range[1]} bpm`;
+            }
+        }
+    });
     
     if (loading) return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 16 }}>
@@ -2564,107 +3000,158 @@ function App() {
                 </div>
             </div>
             
-            {/* HR Zone Distribution + Volume by Modality */}
+            {/* HR Zone Distribution + Training Load */}
             {(() => {
-                // Classify workouts by HR zone
+                const wz = computedData?.weekZones;
+                const acwr = computedData?.acwr;
+                const drift = computedData?.driftCheck;
+                const sessionHR = computedData?.sessionHRTargets;
                 const weekWorkouts = workoutStats.weekWorkouts || [];
-                let z2Mins = 0, z3Mins = 0, z4Mins = 0, z5Mins = 0, strMins = 0;
-                let stepperMins = 0, runMins = 0, runKm = 0;
                 
+                if (!wz) return null;
+                
+                // Modality split
+                let stepperMins = 0, runMins = 0, runKm = 0, rowMins = 0, strMins = 0;
                 weekWorkouts.forEach(w => {
                     const dur = parseFloat(w['Duration (min)']) || 0;
-                    const hr = parseFloat(w['Avg HR']) || 0;
                     const dist = parseFloat(w['Distance (km)']) || 0;
                     const type = (w['Workout Type'] || '').toLowerCase();
-                    
-                    // HR zone classification (based on max HR ~185)
-                    if (type.includes('strength') || type.includes('functional') || type.includes('cross')) {
-                        strMins += dur;
-                    } else if (hr > 0) {
-                        if (hr < 145) z2Mins += dur;
-                        else if (hr < 160) z3Mins += dur;
-                        else if (hr < 175) z4Mins += dur;
-                        else z5Mins += dur;
-                    } else if (dur > 0) {
-                        // No HR data — estimate from workout type
-                        if (type.includes('walk') || type.includes('easy') || type.includes('stepper') || type.includes('stair')) z2Mins += dur;
-                        else if (type.includes('run')) z2Mins += dur * 0.7;
-                        else z2Mins += dur;
-                    }
-                    
-                    // Modality classification
-                    if (type.includes('stair') || type.includes('stepper') || type.includes('step')) {
-                        stepperMins += dur;
-                    } else if (type.includes('run') || type.includes('jog')) {
-                        runMins += dur;
-                        runKm += dist;
-                    }
+                    if (type.includes('stair') || type.includes('stepper') || type.includes('step')) stepperMins += dur;
+                    else if (type.includes('run') || type.includes('jog')) { runMins += dur; runKm += dist; }
+                    else if (type.includes('row')) rowMins += dur;
+                    else if (type.includes('strength') || type.includes('functional') || type.includes('traditional')) strMins += dur;
                 });
-                
-                const totalCardio = z2Mins + z3Mins + z4Mins + z5Mins;
-                const z2Pct = totalCardio > 0 ? (z2Mins / totalCardio * 100) : 0;
-                const z4Pct = totalCardio > 0 ? ((z3Mins + z4Mins) / totalCardio * 100) : 0;
-                const z5Pct = totalCardio > 0 ? (z5Mins / totalCardio * 100) : 0;
-                
-                // Target: 80% Z2, 15% threshold, 5% VO₂max (polarized model)
-                const z2Target = 80;
-                const isGoodDistribution = z2Pct >= 70;
                 
                 return (
                     <div className="px-5 mb-4 fade-up delay-3">
                         <div className="card" style={{ padding: 20 }}>
+                            {/* Header with polarized status */}
                             <div className="flex flex-between flex-center" style={{ marginBottom: 16 }}>
                                 <p className="label">HR ZONE DISTRIBUTION</p>
                                 <span style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, 
-                                    background: totalCardio === 0 ? 'rgba(0,0,0,0.04)' : isGoodDistribution ? 'var(--green-dim)' : 'var(--orange-dim)',
-                                    color: totalCardio === 0 ? 'var(--text-tertiary)' : isGoodDistribution ? 'var(--green)' : 'var(--orange)',
+                                    background: wz.totalCardio === 0 ? 'rgba(0,0,0,0.04)' : wz.isPolarized ? 'var(--green-dim)' : 'var(--orange-dim)',
+                                    color: wz.totalCardio === 0 ? 'var(--text-tertiary)' : wz.isPolarized ? 'var(--green)' : 'var(--orange)',
                                     fontWeight: 600 }}>
-                                    {totalCardio === 0 ? 'No data' : isGoodDistribution ? 'Polarized ✓' : 'Review mix'}
+                                    {wz.totalCardio === 0 ? 'No data' : wz.isPolarized ? 'Polarized ✓' : 'Review mix'}
                                 </span>
                             </div>
                             
-                            {/* Stacked bar */}
-                            {totalCardio > 0 ? (
+                            {/* 5-zone stacked bar */}
+                            {wz.totalCardio > 0 ? (
                                 <>
                                     <div style={{ display: 'flex', height: 28, borderRadius: 14, overflow: 'hidden', marginBottom: 14 }}>
-                                        {z2Mins > 0 && <div style={{ width: `${z2Pct}%`, background: 'var(--green)', transition: 'width 0.5s' }} />}
-                                        {(z3Mins + z4Mins) > 0 && <div style={{ width: `${z4Pct}%`, background: 'var(--orange)', transition: 'width 0.5s' }} />}
-                                        {z5Mins > 0 && <div style={{ width: `${z5Pct}%`, background: 'var(--red)', transition: 'width 0.5s' }} />}
+                                        {[1,2,3,4,5].map(z => {
+                                            const mins = wz.zones[`z${z}`];
+                                            const pct = mins / wz.totalCardio * 100;
+                                            if (pct < 0.5) return null;
+                                            return <div key={z} style={{ width: `${pct}%`, background: hrEngine.zone(z).color, transition: 'width 0.5s' }} />;
+                                        })}
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                    
+                                    {/* 3-bucket polarized view: Easy / Tempo / Hard */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
                                         <div style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, justifyContent: 'center' }}>
                                                 <div style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--green)' }} />
-                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Zone 2</span>
+                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Easy (Z1-2)</span>
                                             </div>
-                                            <p style={{ fontSize: 18, fontWeight: 600 }}>{Math.round(z2Pct)}%</p>
-                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(z2Mins)}min</p>
+                                            <p style={{ fontSize: 22, fontWeight: 700 }}>{Math.round(wz.easy.pct)}%</p>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(wz.easy.mins)}min</p>
+                                            <p style={{ fontSize: 10, color: wz.easy.pct >= 75 ? 'var(--green)' : 'var(--orange)' }}>Target: {CONFIG.polarizedTarget.easy}%</p>
                                         </div>
                                         <div style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                                                <div style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--orange)' }} />
-                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Threshold</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, justifyContent: 'center' }}>
+                                                <div style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--blue)' }} />
+                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Tempo (Z3)</span>
                                             </div>
-                                            <p style={{ fontSize: 18, fontWeight: 600 }}>{Math.round(z4Pct)}%</p>
-                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(z3Mins + z4Mins)}min</p>
+                                            <p style={{ fontSize: 22, fontWeight: 700 }}>{Math.round(wz.tempo.pct)}%</p>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(wz.tempo.mins)}min</p>
+                                            <p style={{ fontSize: 10, color: wz.tempo.pct <= 10 ? 'var(--green)' : 'var(--orange)' }}>Avoid Z3</p>
                                         </div>
                                         <div style={{ textAlign: 'center' }}>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, justifyContent: 'center' }}>
                                                 <div style={{ width: 8, height: 8, borderRadius: 4, background: 'var(--red)' }} />
-                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>VO₂max</span>
+                                                <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Hard (Z4-5)</span>
                                             </div>
-                                            <p style={{ fontSize: 18, fontWeight: 600 }}>{Math.round(z5Pct)}%</p>
-                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(z5Mins)}min</p>
+                                            <p style={{ fontSize: 22, fontWeight: 700 }}>{Math.round(wz.hard.pct)}%</p>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{Math.round(wz.hard.mins)}min</p>
+                                            <p style={{ fontSize: 10, color: wz.hard.pct >= 15 && wz.hard.pct <= 25 ? 'var(--green)' : 'var(--orange)' }}>Target: {CONFIG.polarizedTarget.hard}%</p>
                                         </div>
+                                    </div>
+                                    
+                                    {/* Detailed 5-zone breakdown */}
+                                    <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>
+                                        {[1,2,3,4,5].map(z => {
+                                            const mins = wz.zones[`z${z}`];
+                                            const [lo, hi] = hrEngine.range(z);
+                                            return (
+                                                <div key={z} style={{ flex: 1, textAlign: 'center', padding: '8px 4px', background: mins > 0 ? 'rgba(0,0,0,0.02)' : 'transparent', borderRadius: 8 }}>
+                                                    <p style={{ fontSize: 10, fontWeight: 600, color: hrEngine.zone(z).color, marginBottom: 2 }}>{hrEngine.zone(z).label}</p>
+                                                    <p style={{ fontSize: 13, fontWeight: 600 }}>{Math.round(mins)}m</p>
+                                                    <p style={{ fontSize: 9, color: 'var(--text-tertiary)' }}>{lo}-{hi}</p>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </>
                             ) : (
                                 <p style={{ color: 'var(--text-tertiary)', fontSize: 14, textAlign: 'center', padding: 20 }}>No cardio data this week yet</p>
                             )}
                             
+                            {/* ACWR — Training Load Balance */}
+                            {acwr && acwr.chronic > 0 && (
+                                <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                    <div className="flex flex-between flex-center" style={{ marginBottom: 10 }}>
+                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: 0.5 }}>TRAINING LOAD BALANCE</p>
+                                        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6,
+                                            background: acwr.status === 'optimal' ? 'var(--green-dim)' : acwr.status === 'detraining' ? 'var(--blue-dim)' : 'var(--orange-dim)',
+                                            color: acwr.status === 'optimal' ? 'var(--green)' : acwr.status === 'detraining' ? 'var(--blue)' : 'var(--orange)',
+                                            fontWeight: 600 }}>
+                                            {acwr.status === 'optimal' ? 'Sweet spot' : acwr.status === 'overreach' ? 'Hard week' : acwr.status === 'danger' ? '⚠ Back off' : 'Ramp up'}
+                                        </span>
+                                    </div>
+                                    <div className="flex flex-between" style={{ gap: 16 }}>
+                                        <div>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>7-day (acute)</p>
+                                            <p style={{ fontSize: 16, fontWeight: 600 }}>{acwr.acute.toFixed(0)}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>28-day (chronic)</p>
+                                            <p style={{ fontSize: 16, fontWeight: 600 }}>{acwr.chronic.toFixed(0)}</p>
+                                        </div>
+                                        <div>
+                                            <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>A:C Ratio</p>
+                                            <p style={{ fontSize: 16, fontWeight: 700, color: acwr.status === 'optimal' ? 'var(--green)' : 'var(--orange)' }}>{acwr.ratio.toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>Optimal: 0.8–1.3 · Above 1.5 = injury risk</p>
+                                </div>
+                            )}
+                            
+                            {/* Cardiac Efficiency Trend */}
+                            {drift && (
+                                <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                    <div className="flex flex-between flex-center">
+                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: 0.5 }}>Z2 CARDIAC EFFICIENCY</p>
+                                        <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6,
+                                            background: drift.improving ? 'var(--green-dim)' : drift.concern ? 'var(--red-dim)' : 'rgba(0,0,0,0.04)',
+                                            color: drift.improving ? 'var(--green)' : drift.concern ? 'var(--red)' : 'var(--text-secondary)',
+                                            fontWeight: 600 }}>
+                                            {drift.improving ? 'Improving ↓' : drift.concern ? 'Drifting ↑' : 'Stable →'}
+                                        </span>
+                                    </div>
+                                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>
+                                        Avg HR in Z2: {drift.olderAvgHR} → {drift.recentAvgHR} bpm ({drift.drift > 0 ? '+' : ''}{drift.drift}%)
+                                    </p>
+                                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                                        {drift.improving ? 'Lower HR at same effort = growing aerobic engine' : drift.concern ? 'Rising HR may indicate fatigue or insufficient Z2 volume' : 'Consistent Z2 effort'}
+                                    </p>
+                                </div>
+                            )}
+                            
                             {/* Modality split */}
-                            {(stepperMins > 0 || runMins > 0) && (
-                                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                            {(stepperMins > 0 || runMins > 0 || rowMins > 0) && (
+                                <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
                                     <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10, fontWeight: 600, letterSpacing: 0.5 }}>MODALITY SPLIT</p>
                                     <div style={{ display: 'flex', gap: 12 }}>
                                         {stepperMins > 0 && (
@@ -2688,6 +3175,103 @@ function App() {
                                     </div>
                                 </div>
                             )}
+                            
+                            {/* Pace:HR Coupling — Aerobic Efficiency */}
+                            {(() => {
+                                const phr = computedData?.paceHR;
+                                if (!phr) return null;
+                                return (
+                                    <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                        <div className="flex flex-between flex-center">
+                                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: 0.5 }}>PACE:HR COUPLING</p>
+                                            <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6,
+                                                background: phr.improving ? 'var(--green-dim)' : phr.concern ? 'var(--red-dim)' : 'rgba(0,0,0,0.04)',
+                                                color: phr.improving ? 'var(--green)' : phr.concern ? 'var(--red)' : 'var(--text-secondary)',
+                                                fontWeight: 600 }}>
+                                                {phr.improving ? 'More efficient ↑' : phr.concern ? 'Decoupling ↓' : 'Stable →'}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-between" style={{ gap: 16, marginTop: 8 }}>
+                                            <div>
+                                                <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Earlier runs</p>
+                                                <p style={{ fontSize: 14, fontWeight: 600 }}>{phr.olderAvg.pace.toFixed(1)} min/km @ {phr.olderAvg.hr} bpm</p>
+                                            </div>
+                                            <div>
+                                                <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Recent runs</p>
+                                                <p style={{ fontSize: 14, fontWeight: 600 }}>{phr.recentAvg.pace.toFixed(1)} min/km @ {phr.recentAvg.hr} bpm</p>
+                                            </div>
+                                        </div>
+                                        <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 6 }}>
+                                            {phr.improving ? 'Running faster or at lower HR = aerobic engine growing' 
+                                                : phr.concern ? 'HR rising at same pace — may need more Z2 volume or recovery'
+                                                : 'Pace and HR relationship holding steady'}
+                                        </p>
+                                    </div>
+                                );
+                            })()}
+                            
+                            {/* Weekly Zone Trend — 4-week view */}
+                            {(() => {
+                                const zt = computedData?.zoneTrend;
+                                if (!zt || zt.length === 0) return null;
+                                const hasData = zt.some(w => w.totalCardio > 0);
+                                if (!hasData) return null;
+                                return (
+                                    <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 10, fontWeight: 600, letterSpacing: 0.5 }}>4-WEEK ZONE TREND</p>
+                                        <div style={{ display: 'flex', gap: 6 }}>
+                                            {zt.map((w, i) => (
+                                                <div key={i} style={{ flex: 1, textAlign: 'center' }}>
+                                                    <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginBottom: 4 }}>{w.label}</p>
+                                                    {/* Mini stacked bar */}
+                                                    <div style={{ height: 60, display: 'flex', flexDirection: 'column', borderRadius: 6, overflow: 'hidden', background: 'rgba(0,0,0,0.03)' }}>
+                                                        {w.totalCardio > 0 ? (
+                                                            <>
+                                                                <div style={{ flex: w.hard.pct, background: 'var(--red)', minHeight: w.hard.pct > 0 ? 2 : 0 }} />
+                                                                <div style={{ flex: w.tempo.pct, background: 'var(--blue)', minHeight: w.tempo.pct > 0 ? 2 : 0 }} />
+                                                                <div style={{ flex: w.easy.pct, background: 'var(--green)', minHeight: w.easy.pct > 0 ? 2 : 0 }} />
+                                                            </>
+                                                        ) : (
+                                                            <div style={{ flex: 1 }} />
+                                                        )}
+                                                    </div>
+                                                    <p style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 3 }}>
+                                                        {w.totalCardio > 0 ? `${Math.round(w.totalCardio)}m` : '—'}
+                                                    </p>
+                                                    {w.totalCardio > 0 && (
+                                                        <p style={{ fontSize: 9, color: w.isPolarized ? 'var(--green)' : 'var(--orange)' }}>
+                                                            {Math.round(w.easy.pct)}/{Math.round(w.hard.pct)}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p style={{ fontSize: 10, color: 'var(--text-tertiary)', textAlign: 'center', marginTop: 6 }}>
+                                            Easy/Hard % · Target: 80/20
+                                        </p>
+                                    </div>
+                                );
+                            })()}
+                            
+                            {/* Readiness-Based Intensity Recommendation */}
+                            {(() => {
+                                const rec = readiness.score > 0 ? hrEngine.sessionRecommendation(readiness.score, acwr, computedData?.yesterdayZone) : null;
+                                if (!rec) return null;
+                                return (
+                                    <div style={{ marginTop: 4, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+                                        <div className="flex flex-between flex-center">
+                                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', fontWeight: 600, letterSpacing: 0.5 }}>TODAY'S RECOMMENDATION</p>
+                                            <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6,
+                                                background: rec.color === 'green' ? 'var(--green-dim)' : rec.color === 'red' ? 'var(--red-dim)' : 'var(--blue-dim)',
+                                                color: rec.color === 'green' ? 'var(--green)' : rec.color === 'red' ? 'var(--red)' : 'var(--blue)',
+                                                fontWeight: 600, textTransform: 'capitalize' }}>
+                                                {rec.intensity}
+                                            </span>
+                                        </div>
+                                        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 6 }}>{rec.msg}</p>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 );
@@ -2778,6 +3362,11 @@ function App() {
                                         <p style={{ fontWeight: 500 }}>
                                             {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
                                         </p>
+                                        {session.hrTargets?.target && (
+                                            <p style={{ fontSize: 11, color: session.zone === 2 ? 'var(--green)' : session.zone >= 4 ? 'var(--red)' : 'var(--text-tertiary)', marginTop: 2 }}>
+                                                💓 {session.hrTargets.target} bpm ({session.hrTargets.range[0]}–{session.hrTargets.range[1]})
+                                            </p>
+                                        )}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                         {session.duration > 0 && (
