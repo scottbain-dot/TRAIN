@@ -420,18 +420,19 @@
         .modal-sheet {
             position: absolute;
             bottom: 0;
-            left: 0;
-            right: 0;
+            left: 50%;
+            transform: translateX(-50%) translateY(100%);
+            width: 100%;
+            max-width: 500px;
             max-height: 94vh;
             background: var(--bg);
             border-radius: 24px 24px 0 0;
             overflow-y: auto;
-            transform: translateY(100%);
             transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
             box-shadow: 0 -4px 32px rgba(0,0,0,0.12);
         }
         .modal-overlay.open .modal-sheet {
-            transform: translateY(0);
+            transform: translateX(-50%) translateY(0);
         }
         .modal-handle {
             width: 36px;
@@ -590,8 +591,24 @@ const { useState, useEffect, useMemo } = React;
 // CONFIGURATION
 // ============================================
 const CONFIG = {
-    sheetId: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc',
-    sheets: { workouts: 'Workouts', daily: 'DailyMetrics', weeklyPlan: 'WeeklyPlan', strengthA: 'StrengthA', strengthB: 'StrengthB' },
+    // Data lives across multiple Google Sheets
+    // Health Auto Export creates a NEW sheet each month for metrics
+    dataSources: {
+        workouts: { sheetId: '1r-IO6Ce-uKJ6SYuEz1IiapHniosIKoyPUwkpGzR3dlM', tab: 'Workouts-2026' },
+        daily: { 
+            // Health Auto Export creates monthly sheets with tab name "HealthMetrics-YYYY-MM"
+            // Since each month is a NEW Google Sheet (not just a new tab), we list sheet IDs per month
+            // The app tries all of them and merges the results
+            sheets: {
+                '2026-02': '1-mUTvwJCzVio0--3DHKBMaaoVHp_yF4kWvXoVYg1EYY',
+                // Add new months as Health Auto Export creates them:
+                // '2026-03': 'PASTE_MARCH_SHEET_ID_HERE',
+                // '2026-04': 'PASTE_APRIL_SHEET_ID_HERE',
+            },
+            tabPattern: 'HealthMetrics-',  // tab name = tabPattern + YYYY-MM
+        },
+        plan: { sheetId: '1BlGGukORumWb7508lcu-SS0wF8lMwdOJEsOp-vGCKrc', tabs: { weeklyPlan: 'WeeklyPlan', strengthA: 'StrengthA', strengthB: 'StrengthB' } }
+    },
     targets: { vo2max: 48, twoKm: 465, threshold: 255, weeklyKm: 50, raceTime: 3900 },
     baselines: { vo2max: 43.5, twoKm: 540, threshold: 285 },
     profile: { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15', raceName: 'Malaga' }
@@ -632,74 +649,162 @@ const math = {
 // ============================================
 // DATA FETCHING
 // ============================================
-const fetchSheet = async (name) => {
+const fetchSheet = async (sheetId, tabName) => {
     try {
-        const url = `https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(name)}`;
+        const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tabName)}`;
         const res = await fetch(url);
         const txt = await res.text();
         const json = JSON.parse(txt.substring(47).slice(0, -2));
         const headers = json.table.cols.map(c => c.label || '');
         
-        const rawData = json.table.rows?.map(row => {
+        let rawData = json.table.rows?.map(row => {
             const obj = {};
             row.c?.forEach((cell, i) => {
                 if (headers[i]) {
-                    if (headers[i] === 'Date') {
-                        obj[headers[i]] = cell?.f || cell?.v || null;
+                    if (headers[i] === 'Date' || headers[i] === 'Start' || headers[i] === 'Date/Time') {
+                        // Google gviz returns dates as "Date(2026,1,24)" in v, formatted string in f
+                        const v = cell?.v;
+                        const f = cell?.f;
+                        if (typeof v === 'string' && v.startsWith('Date(')) {
+                            const m = v.match(/Date\((\d+),(\d+),(\d+)/);
+                            if (m) {
+                                const dt = new Date(parseInt(m[1]), parseInt(m[2]), parseInt(m[3]));
+                                obj[headers[i]] = dt.toISOString().split('T')[0];
+                            } else {
+                                obj[headers[i]] = f || v || null;
+                            }
+                        } else if (f) {
+                            // Try to extract just the date part (could be "2026-02-24 7:57")
+                            const dateOnly = f.split(' ')[0];
+                            const iso = dateOnly.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+                            const slash = dateOnly.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+                            if (iso) {
+                                obj[headers[i]] = `${iso[1]}-${String(iso[2]).padStart(2,'0')}-${String(iso[3]).padStart(2,'0')}`;
+                            } else if (slash) {
+                                const a = parseInt(slash[1]), b = parseInt(slash[2]), y = parseInt(slash[3]);
+                                // Assume DD/MM/YYYY for European locale
+                                obj[headers[i]] = a > 12 ? `${y}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}` :
+                                    b > 12 ? `${y}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}` :
+                                    `${y}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`;
+                            } else {
+                                obj[headers[i]] = f;
+                            }
+                        } else {
+                            obj[headers[i]] = v || null;
+                        }
                     } else {
                         obj[headers[i]] = cell?.v ?? cell?.f ?? null;
                     }
                 }
             });
             return obj;
-        }).filter(o => o['Date']) || [];
+        }).filter(o => o['Date'] || o['Start'] || o['Date/Time']) || [];
         
-        // Aggregate rows by date — Health Auto Export writes fragments across multiple rows
-        if (name === CONFIG.sheets.daily) {
+        // ═══ MAP Health Auto Export workout columns to app format ═══
+        if (headers.includes('Type') && headers.includes('Start') && !headers.includes('Workout Type')) {
+            rawData = rawData.map(w => {
+                // Duration: "0:50:05" → minutes
+                let durMin = 0;
+                const durStr = w['Duration'] || '';
+                if (durStr) {
+                    const parts = durStr.toString().split(':');
+                    if (parts.length === 3) durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]) + parseInt(parts[2]) / 60;
+                    else if (parts.length === 2) durMin = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+                    else durMin = parseFloat(durStr) || 0;
+                }
+                
+                // Energy: kJ → kcal (÷ 4.184)
+                const kj = parseFloat(w['Active Energy (kJ)']) || 0;
+                const cal = Math.round(kj / 4.184);
+                
+                return {
+                    'Date': w['Start'] || w['Date'],
+                    'Workout Type': w['Type'] || '',
+                    'Duration (min)': durMin.toFixed(1),
+                    'Distance (km)': w['Distance (km)'] || 0,
+                    'Avg HR': w['Avg Heart Rate (bpm)'] || 0,
+                    'Max HR': w['Max Heart Rate (bpm)'] || 0,
+                    'Calories': cal,
+                    'Avg Pace (sec/km)': (w['Avg Speed (km/hr)'] && parseFloat(w['Avg Speed (km/hr)']) > 0) 
+                        ? Math.round(3600 / parseFloat(w['Avg Speed (km/hr)'])) : 0,
+                    'Flights Climbed': w['Flights Climbed (count)'] || 0,
+                    'Step Count': w['Step Count (count)'] || 0,
+                    '_raw': w // Keep original data accessible
+                };
+            });
+            console.log(`[Workouts] Mapped ${rawData.length} Health Auto Export rows`);
+        }
+        
+        // ═══ MAP Health Auto Export daily metrics columns to app format ═══
+        if (headers.includes('Date/Time') && headers.includes('Resting Heart Rate (count/min)')) {
+            rawData = rawData.map(row => ({
+                'Date': row['Date/Time'] || row['Date'],
+                'Resting HR': row['Resting Heart Rate (count/min)'] || '',
+                'HRV (ms)': row['Heart Rate Variability (ms)'] || '',
+                'Sleep Duration (hr)': row['Sleep Analysis [Asleep] (hr)'] || row['Sleep Analysis [Total] (hr)'] || '',
+                'Deep Sleep (hr)': row['Sleep Analysis [Deep] (hr)'] || '',
+                'REM Sleep (hr)': row['Sleep Analysis [REM] (hr)'] || '',
+                'VO2 Max': row['VO2 Max (ml/(kg·min))'] || '',
+                'Avg HR': row['Heart Rate [Avg] (count/min)'] || '',
+                'Step Count': row['Step Count (count)'] || '',
+                'Walking Distance (km)': row['Walking + Running Distance (km)'] || '',
+                'Respiratory Rate': row['Respiratory Rate (count/min)'] || '',
+                '_raw': row
+            }));
+            console.log(`[Metrics] Mapped ${rawData.length} Health Auto Export rows`);
+        }
+        
+        // Aggregate rows by date — Health Auto Export may have multiple rows per day
+        const isDailyMetrics = tabName.startsWith(CONFIG.dataSources.daily.tabPattern);
+        if (isDailyMetrics) {
             const byDate = {};
             rawData.forEach(row => {
                 const d = row['Date'];
+                if (!d) return;
                 if (!byDate[d]) byDate[d] = { Date: d };
-                headers.forEach(h => {
-                    if (h && h !== 'Date') {
-                        const val = parseFloat(row[h]);
-                        if (!isNaN(val) && val > 0) {
-                            // For Steps and Calories, sum them; for everything else take latest non-null
-                            if (h === 'Steps' || h === 'Active Calories') {
-                                byDate[d][h] = (byDate[d][h] || 0) + val;
-                            } else {
-                                byDate[d][h] = val;
-                            }
+                const mappedKeys = Object.keys(row).filter(k => k !== 'Date' && k !== '_raw');
+                mappedKeys.forEach(h => {
+                    const val = parseFloat(row[h]);
+                    if (!isNaN(val) && val > 0) {
+                        if (h === 'Step Count') {
+                            byDate[d][h] = (byDate[d][h] || 0) + val;
+                        } else {
+                            byDate[d][h] = val;
                         }
                     }
                 });
+                });
             });
             
-            // Sanity-check sleep values
+            // Sanity-check sleep values — Health Auto Export sends varied units
             Object.values(byDate).forEach(row => {
-                const sleep = parseFloat(row['Sleep Duration (hr)']);
-                if (sleep > 16) {
-                    if (sleep > 24 && sleep <= 960) {
-                        row['Sleep Duration (hr)'] = (sleep / 60).toFixed(2); // was in minutes
-                    } else {
-                        row['Sleep Duration (hr)'] = ''; // garbage data, discard
-                    }
-                }
+                let sleep = parseFloat(row['Sleep Duration (hr)']);
+                if (!sleep || sleep <= 0) { row['Sleep Duration (hr)'] = ''; return; }
+                
+                // >960 = probably seconds (e.g. 25200s = 7hr)
+                if (sleep > 960) sleep = sleep / 3600;
+                // >16 = probably minutes (e.g. 420min = 7hr)
+                else if (sleep > 16) sleep = sleep / 60;
+                
+                // <3h = nap or garbage, discard as not a real night
+                row['Sleep Duration (hr)'] = sleep >= 3 ? sleep.toFixed(2) : '';
+                
+                // Deep sleep + REM
                 const deep = parseFloat(row['Deep Sleep (hr)']);
-                if (deep > 8) row['Deep Sleep (hr)'] = deep > 480 ? '' : (deep / 60).toFixed(2);
+                if (deep > 0) row['Deep Sleep (hr)'] = deep > 960 ? (deep/3600).toFixed(2) : deep > 8 ? (deep > 480 ? '' : (deep/60).toFixed(2)) : deep.toFixed(2);
                 const rem = parseFloat(row['REM Sleep (hr)']);
-                if (rem > 8) row['REM Sleep (hr)'] = rem > 480 ? '' : (rem / 60).toFixed(2);
+                if (rem > 0) row['REM Sleep (hr)'] = rem > 960 ? (rem/3600).toFixed(2) : rem > 8 ? (rem > 480 ? '' : (rem/60).toFixed(2)) : rem.toFixed(2);
             });
             
             const merged = Object.values(byDate);
-            console.log(`[${name}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
+            console.log(`[${tabName}] Loaded ${rawData.length} raw rows → merged to ${merged.length} days`);
             return merged;
         }
         
-        console.log(`[${name}] Loaded ${rawData.length} rows`);
+        console.log(`[${tabName}] Loaded ${rawData.length} rows`);
         
         // Clean up workout durations — Health Auto Export sometimes sends seconds instead of minutes
-        if (name === CONFIG.sheets.workouts) {
+        if (tabName === CONFIG.dataSources.workouts.tab) {
             rawData.forEach(w => {
                 let dur = parseFloat(w['Duration (min)']) || 0;
                 const dist = parseFloat(w['Distance (km)']) || 0;
@@ -749,7 +854,7 @@ const fetchSheet = async (name) => {
         
         return rawData;
     } catch (e) {
-        console.error(`[${name}] Error:`, e);
+        console.error(`[${tabName}] Error:`, e);
         return [];
     }
 };
@@ -1171,8 +1276,8 @@ const SessionCard = ({ session, isToday, onClick }) => {
     const badgeText = session.zone === 2 ? 'Z2' : session.zone === 4 ? 'THR' 
         : session.zone === 5 ? 'VO₂' : session.zone === 'str' ? 'STR' 
         : session.zone === 'sim' ? 'SIM' : 'REST';
-    const modalityIcon = session.modality === 'stepper' ? '🪜' : session.modality === 'run' ? '🏃' 
-        : session.modality === 'bike' ? '🚴' : session.modality === 'gym' ? '🏋️' 
+    const modalityIcon = session.modality === 'stepper' ? '⏫' : session.modality === 'run' ? '🏃' 
+        : session.modality === 'bike' ? '🚴' : session.modality === 'gym' ? '💪' 
         : session.modality === 'swim' ? '🏊' : '';
     
     return (
@@ -1527,11 +1632,11 @@ const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
                         </div>
                     )}
                     
-                    <button onClick={() => onLogTest('miniSim')} style={{ width: '100%', marginTop: 20, padding: 16, background: 'var(--purple)', border: 'none', borderRadius: 14, color: 'var(--text)', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>
+                    <button onClick={() => onLogTest('miniSim')} style={{ width: '100%', marginTop: 20, padding: 16, background: 'var(--purple)', border: 'none', borderRadius: 14, color: '#ffffff', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>
                         Log Mini-Sim
                     </button>
                     
-                    <InsightBox title={`🏋️ ${insight.title}`} text={insight.text} color={insight.color} />
+                    <InsightBox title={`💪 ${insight.title}`} text={insight.text} color={insight.color} />
                 </div>
             </div>
         </div>
@@ -1573,9 +1678,53 @@ const SessionModal = ({ session, onClose }) => (
                 {session.exercises && (
                     <div className="modal-section">
                         <p className="label" style={{ marginBottom: 12 }}>EXERCISES</p>
-                        {session.exercises.map((ex, i) => (
-                            <div key={i} style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>{ex}</div>
-                        ))}
+                        {session.exercises.map((ex, i) => {
+                            // Parse "Exercise: 3×5 @120kg" or "Exercise: 3×5 @120kg — note"
+                            const isStructured = typeof ex === 'object';
+                            if (isStructured) {
+                                // Object format: { name, sets, load, note, category }
+                                const catColors = {
+                                    'LOWER': 'var(--blue)', 'UPPER': 'var(--blue)', 'POWER': 'var(--orange)',
+                                    'CORE': '#0EA5E9', 'CALVES': 'var(--green)', 'CALF': 'var(--green)',
+                                    'SPRINT': 'var(--red)', 'PREHAB': 'var(--text-secondary)'
+                                };
+                                const catKey = Object.keys(catColors).find(k => (ex.category || '').toUpperCase().startsWith(k));
+                                const color = catColors[catKey] || 'var(--text-secondary)';
+                                return (
+                                    <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                                                <span style={{ width: 4, height: 4, borderRadius: 2, background: color, flexShrink: 0 }}></span>
+                                                <span style={{ fontWeight: 600, fontSize: 14 }}>{ex.name}</span>
+                                            </div>
+                                            {ex.note && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 12, marginTop: 2 }}>{ex.note}</p>}
+                                        </div>
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <p style={{ fontWeight: 600, fontSize: 14 }}>{ex.sets}</p>
+                                            {ex.load && <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ex.load}</p>}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            // String format: "Exercise: 3×5 @120kg" or just "Exercise"
+                            const parts = ex.match(/^(.+?):\s*(.+?)(?:\s*@(.+?))?(?:\s*[—–]\s*(.+))?$/);
+                            if (parts) {
+                                return (
+                                    <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ fontWeight: 600, fontSize: 14 }}>{parts[1].trim()}</p>
+                                            {parts[4] && <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>{parts[4].trim()}</p>}
+                                        </div>
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <p style={{ fontWeight: 600, fontSize: 14 }}>{parts[2].trim()}</p>
+                                            {parts[3] && <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>@{parts[3].trim()}</p>}
+                                        </div>
+                                    </div>
+                                );
+                            }
+                            // Plain string fallback
+                            return <div key={i} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 14 }}>{ex}</div>;
+                        })}
                     </div>
                 )}
                 
@@ -1789,7 +1938,7 @@ const TestModal = ({ type, onClose, onSave }) => {
                     
                     <div className="grid-2 mt-5">
                         <button onClick={onClose} style={{ padding: 16, background: 'var(--card-elevated)', border: '1px solid var(--border)', borderRadius: 14, color: 'var(--text)', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
-                        <button onClick={handleSave} style={{ padding: 16, background: 'var(--blue)', border: 'none', borderRadius: 14, color: 'var(--text)', fontWeight: 600, cursor: 'pointer' }}>Save</button>
+                        <button onClick={handleSave} style={{ padding: 16, background: 'var(--blue)', border: 'none', borderRadius: 14, color: '#ffffff', fontWeight: 600, cursor: 'pointer' }}>Save</button>
                     </div>
                 </div>
             </div>
@@ -1815,14 +1964,25 @@ function App() {
     // Load data
     useEffect(() => {
         (async () => {
-            const [w, d, wp, sa, sb] = await Promise.all([
-                fetchSheet(CONFIG.sheets.workouts),
-                fetchSheet(CONFIG.sheets.daily),
-                fetchSheet(CONFIG.sheets.weeklyPlan).catch(() => []),
-                fetchSheet(CONFIG.sheets.strengthA).catch(() => []),
-                fetchSheet(CONFIG.sheets.strengthB).catch(() => [])
+            // Fetch metrics from all monthly sheets and merge
+            const monthEntries = Object.entries(CONFIG.dataSources.daily.sheets);
+            const dailyPromises = monthEntries.map(([month, sheetId]) => {
+                const tabName = CONFIG.dataSources.daily.tabPattern + month;
+                return fetchSheet(sheetId, tabName).catch(e => { console.warn(`[Metrics] Failed to load ${month}:`, e); return []; });
+            });
+            const [w, ...dailyArrays] = await Promise.all([
+                fetchSheet(CONFIG.dataSources.workouts.sheetId, CONFIG.dataSources.workouts.tab),
+                ...dailyPromises
+            ]);
+            const d = dailyArrays.flat();
+            const [wp, sa, sb] = await Promise.all([
+                fetchSheet(CONFIG.dataSources.plan.sheetId, CONFIG.dataSources.plan.tabs.weeklyPlan).catch(() => []),
+                fetchSheet(CONFIG.dataSources.plan.sheetId, CONFIG.dataSources.plan.tabs.strengthA).catch(() => []),
+                fetchSheet(CONFIG.dataSources.plan.sheetId, CONFIG.dataSources.plan.tabs.strengthB).catch(() => [])
             ]);
             setWorkouts(w);
+            console.log('[Data Load]', { workouts: w.length, daily: d.length, weeklyPlan: wp.length, strengthA: sa.length, strengthB: sb.length });
+            if (w.length > 0) console.log('[Workout Sample]', { date: w[0]['Date'], type: w[0]['Workout Type'], dist: w[0]['Distance (km)'], dur: w[0]['Duration (min)'] });
             setDaily(d);
             setPlanData({ weekly: wp, strengthA: sa, strengthB: sb });
             setLoading(false);
@@ -1976,12 +2136,44 @@ function App() {
                 { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' }
             ];
             return [
-                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact. HR 130-145.' },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab — alternates Week A/B'] },
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact. HR 130-145.', targets: { 'HR Zone': '130-145 bpm', 'RPE': '3-4 / 10', 'Cadence': '100-120 spm' } },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: isWeekA ? [
+                    { name: 'Hex Bar Squat', sets: '3×5', load: '125kg', note: 'Controlled eccentric, drive up', category: 'LOWER PUSH' },
+                    { name: 'DB Floor Press', sets: '3×5', load: '30kg', note: 'Pause at bottom', category: 'UPPER PUSH' },
+                    { name: 'DB Lunges', sets: '3×5/5', load: '28kg', note: 'Full depth, drive through heel', category: 'LOWER PUSH' },
+                    { name: 'DB Squat Jumps', sets: '3×6', load: '18kg', note: 'Reset each rep. Max height.', category: 'POWER' },
+                    { name: 'Cable Rotations', sets: '3×8/8', load: '16kg', note: 'Anti-rotation → controlled rotation', category: 'CORE' },
+                    { name: 'Standing Calf Raise', sets: '3×6/6', load: '30kg', note: 'Pause 2s top, slow 3s lower', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
+                ] : [
+                    { name: 'Heavy Sled Push + Pull', sets: '4×25m', load: '65kg', note: 'Back and forward = 1 set', category: 'LOWER PUSH' },
+                    { name: 'DB Push Press', sets: '3×5/5', load: '24kg', note: 'Explosive drive from legs', category: 'UPPER PUSH' },
+                    { name: 'DB Lateral Lunge', sets: '3×5/5', load: '24kg', note: 'Full range, drive back to start', category: 'LOWER PUSH' },
+                    { name: 'Explosive Push-ups', sets: '3×6', load: 'BW', note: 'Full clap or hands leave ground', category: 'POWER' },
+                    { name: 'Plank Variations', sets: '2×45s', load: 'BW', note: 'Alternate: plank, side plank, walkout', category: 'CORE' },
+                    { name: 'Plantar Lunge Holds', sets: '3×30s/side', load: 'BW', note: 'Deep lunge, Achilles stretch', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
+                ] },
                 { day: 'Wednesday', type: isWeekA ? 'Running Threshold' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 7 : 6, modality: 'run', purpose: isWeekA ? 'Pure running threshold. Clean data for tracking.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }] },
                 { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, modality: 'run', purpose: 'Maintain running mechanics. 6×30s strides at end for neuromuscular.' },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab — alternates Week A/B'] },
-                { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: 90, distance: 0, modality: 'stepper', purpose: 'Big aerobic session. Zero impact. Build to 100min+.' },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: isWeekA ? [
+                    { name: 'Hex Bar Deadlift', sets: '3×5', load: '135kg', note: 'Reset each rep. Brace hard.', category: 'LOWER PULL' },
+                    { name: 'KB Row (single arm)', sets: '3×6/6', load: '32kg', note: 'Explosive pull, controlled lower', category: 'UPPER PULL' },
+                    { name: 'KB Swing', sets: '3×8', load: '32kg', note: 'Hip snap. Arms are hooks.', category: 'LOWER PULL' },
+                    { name: 'Cleans', sets: '3×5', load: '65kg', note: 'Alternate start: floor/shins/thighs', category: 'POWER' },
+                    { name: 'Hurricane Med Ball Slams', sets: '3×6/6', load: '18kg', note: 'Full rotation, slam to side', category: 'CORE' },
+                    { name: 'Seated Calf Raise', sets: '3×8', load: '28kg', note: 'Pause 2s top, 3s eccentric', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
+                ] : [
+                    { name: 'Stiff-Legged Hex DL', sets: '3×5', load: '110kg', note: 'Slow eccentric, feel hamstrings', category: 'LOWER PULL' },
+                    { name: 'Pull-ups (varied grip)', sets: '3×6-8', load: 'BW+5kg', note: 'Change grip each set', category: 'UPPER PULL' },
+                    { name: 'SL DB Hamstring Swing', sets: '3×6/6', load: '14kg', note: 'Stiff leg, feel stretch', category: 'LOWER PULL' },
+                    { name: 'DB Single Arm Snatch', sets: '3×5/5', load: '22kg', note: 'Floor to overhead in one move', category: 'POWER' },
+                    { name: 'Farmer Carry / OH March', sets: '3×40m', load: '32kg / 2×12kg', note: 'Alternate each set', category: 'CORE' },
+                    { name: 'SL Wall Sit (on toes)', sets: '3×30s/side', load: 'BW', note: 'On toes, knee 90°', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
+                ] },
+                { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: 90, distance: 0, modality: 'stepper', purpose: 'Big aerobic session. Zero impact. Build to 100min+.', targets: { 'HR Zone': '130-145 bpm', 'RPE': '3-4 / 10', 'Goal': 'Build to 100min+' } },
                 { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, modality: 'run', purpose: 'VO₂max stimulus. Push the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }] }
             ];
         }
@@ -1998,10 +2190,42 @@ function App() {
             ];
             return [
                 { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact.' },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab'] },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: isWeekA ? [
+                    { name: 'Hex Bar Squat', sets: '3×5', load: '130kg', note: 'Controlled eccentric, drive up', category: 'LOWER PUSH' },
+                    { name: 'DB Floor Press', sets: '3×5', load: '30kg', note: 'Pause at bottom', category: 'UPPER PUSH' },
+                    { name: 'DB Lunges', sets: '3×5/5', load: '30kg', note: 'Full depth, drive through heel', category: 'LOWER PUSH' },
+                    { name: 'DB Squat Jumps', sets: '3×6', load: '22kg', note: 'Reset each rep. Max height.', category: 'POWER' },
+                    { name: 'Cable Rotations', sets: '3×8/8', load: '18kg', category: 'CORE' },
+                    { name: 'Standing Calf Raise', sets: '3×6/6', load: '32kg', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', note: '52s rest', category: 'SPRINTS' }
+                ] : [
+                    { name: 'Heavy Sled Push + Pull', sets: '4×25m', load: '70kg', category: 'LOWER PUSH' },
+                    { name: 'DB Push Press', sets: '3×5/5', load: '26kg', note: 'Explosive drive from legs', category: 'UPPER PUSH' },
+                    { name: 'DB Lateral Lunge', sets: '3×5/5', load: '26kg', category: 'LOWER PUSH' },
+                    { name: 'Explosive Push-ups', sets: '3×6', load: 'BW', category: 'POWER' },
+                    { name: 'Plank Variations', sets: '2×45s', load: 'BW', category: 'CORE' },
+                    { name: 'Plantar Lunge Holds', sets: '3×30s/side', load: 'BW', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', note: '52s rest', category: 'SPRINTS' }
+                ] },
                 { day: 'Wednesday', type: isWeekA ? 'Threshold Intervals' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 8 : 6, modality: 'run', purpose: isWeekA ? 'Threshold repeats. Clean running data.' : 'Compromised: 4×(1km threshold + station). Priority: ski erg, sled push.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '25 min', note: '4×8min threshold (2min jog)' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + ski erg 500m or sled 4×25m' }, { block: 'Cool-down', time: '5 min' }] },
                 { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 50, distance: 8, modality: 'run', purpose: 'Maintain running mechanics. Strides for neuromuscular.' },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab'] },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: isWeekA ? [
+                    { name: 'Hex Bar Deadlift', sets: '3×5', load: '140kg', note: 'Reset each rep. Brace hard.', category: 'LOWER PULL' },
+                    { name: 'KB Row', sets: '3×6/6', load: '32kg', note: 'Explosive pull', category: 'UPPER PULL' },
+                    { name: 'KB Swing', sets: '3×8', load: '32kg', category: 'LOWER PULL' },
+                    { name: 'Cleans', sets: '3×5', load: '70kg', category: 'POWER' },
+                    { name: 'Hurricane Slams', sets: '3×6/6', load: '20kg', category: 'CORE' },
+                    { name: 'Seated Calf Raise', sets: '3×8', load: '30kg', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', note: '52s rest', category: 'SPRINTS' }
+                ] : [
+                    { name: 'Stiff-Legged Hex DL', sets: '3×5', load: '115kg', category: 'LOWER PULL' },
+                    { name: 'Pull-ups', sets: '3×6-8', load: 'BW+5kg', note: 'Varied grip each set', category: 'UPPER PULL' },
+                    { name: 'SL DB Ham Swing', sets: '3×6/6', load: '16kg', category: 'LOWER PULL' },
+                    { name: 'DB Snatch', sets: '3×5/5', load: '24kg', category: 'POWER' },
+                    { name: 'Farmer Carry / OH March', sets: '3×40m', load: '32kg', category: 'CORE' },
+                    { name: 'SL Wall Sit (toes)', sets: '3×30s/side', load: 'BW', category: 'CALVES' },
+                    { name: '8s Sprints', sets: '4×8s', note: '52s rest', category: 'SPRINTS' }
+                ] },
                 { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: phase === 'Build 1' ? 100 : 115, distance: 0, modality: 'stepper', purpose: phase === 'Build 1' ? 'Build to 110min. Big aerobic session.' : 'Peak long session 110-120min.' },
                 { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 40, distance: 6, modality: 'run', purpose: 'VO₂max session. Expand the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '20 min', note: '5×4min hard (3min jog)' }, { block: 'Cool-down', time: '10 min' }] }
             ];
@@ -2259,7 +2483,7 @@ function App() {
         <div className="container hide-scrollbar">
             <div className="px-5 py-4 fade-up">
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? '🔄 DELOAD/TEST' : `Cycle ${cycleWeek}/4`}{!isDeload && currentPhase.name !== 'Base 1' && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
+                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? '🔄 DELOAD/TEST' : `Cycle ${cycleWeek}/4`}{!isDeload && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
                 </p>
                 <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, marginTop: 4 }}>
                     {todayName === 'Sunday' ? 'Rest Day' : `Today: ${todaySession.type}`}
@@ -2392,10 +2616,10 @@ function App() {
                             <div className="flex flex-between flex-center" style={{ marginBottom: 16 }}>
                                 <p className="label">HR ZONE DISTRIBUTION</p>
                                 <span style={{ fontSize: 12, padding: '3px 8px', borderRadius: 6, 
-                                    background: isGoodDistribution ? 'var(--green-dim)' : 'var(--orange-dim)',
-                                    color: isGoodDistribution ? 'var(--green)' : 'var(--orange)',
+                                    background: totalCardio === 0 ? 'rgba(0,0,0,0.04)' : isGoodDistribution ? 'var(--green-dim)' : 'var(--orange-dim)',
+                                    color: totalCardio === 0 ? 'var(--text-tertiary)' : isGoodDistribution ? 'var(--green)' : 'var(--orange)',
                                     fontWeight: 600 }}>
-                                    {isGoodDistribution ? 'Polarized ✓' : 'Review mix'}
+                                    {totalCardio === 0 ? 'No data' : isGoodDistribution ? 'Polarized ✓' : 'Review mix'}
                                 </span>
                             </div>
                             
@@ -2445,7 +2669,7 @@ function App() {
                                     <div style={{ display: 'flex', gap: 12 }}>
                                         {stepperMins > 0 && (
                                             <div style={{ flex: 1, padding: '10px 14px', background: 'var(--card-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>🪜 Stepper</p>
+                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>⏫ Stepper</p>
                                                 <p style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>{Math.round(stepperMins)}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}> min</span></p>
                                             </div>
                                         )}
@@ -2457,7 +2681,7 @@ function App() {
                                         )}
                                         {strMins > 0 && (
                                             <div style={{ flex: 1, padding: '10px 14px', background: 'var(--card-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>🏋️ Strength</p>
+                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>💪 Strength</p>
                                                 <p style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>{Math.round(strMins)}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}> min</span></p>
                                             </div>
                                         )}
@@ -2552,7 +2776,7 @@ function App() {
                                             {session.day}{session.day === todayName && ' · Today'}
                                         </p>
                                         <p style={{ fontWeight: 500 }}>
-                                            {session.modality === 'stepper' ? '🪜 ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '🏋️ ' : ''}{session.type}
+                                            {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
                                         </p>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -2571,7 +2795,7 @@ function App() {
                     
                     {/* Key Principles */}
                     <div className="px-5 mt-5">
-                        <InsightBox title="📚 Training Philosophy" text="60% running · 20% strength · 20% stations. 80/20 polarized: 80% easy, 20% hard. Simulations rare (1x every 2-3 weeks). Running volume is the #1 predictor (Brownlee)." color="blue" />
+                        <InsightBox title="📚 Training Philosophy" text="3 runs + 2 stepper sessions + 2 strength. Stepper for Z2 volume (zero impact), running for intensity only (threshold, VO₂max, strides). 80/20 polarized: 80% easy, 20% hard. Aerobic volume is the #1 predictor of HYROX performance (Brownlee)." color="blue" />
                     </div>
                 </>
             ) : (
@@ -2658,7 +2882,7 @@ function App() {
         return (
             <div className="container hide-scrollbar">
                 <div className="px-5 py-4">
-                    <h1 style={{ fontSize: 28, fontWeight: 600 }}>History</h1>
+                    <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400 }}>History</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Your training journey</p>
                 </div>
                 
