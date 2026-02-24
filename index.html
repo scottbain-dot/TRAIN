@@ -1152,19 +1152,28 @@ const MetricCard = ({ label, value, unit, insight, trend, gradient, color, onCli
 const SessionCard = ({ session, isToday, onClick }) => {
     const badgeClass = session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' 
         : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest';
-    const badgeText = session.zone === 2 ? '🟢 Zone 2' : session.zone === 4 ? '🟠 Threshold' 
-        : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'str' ? '💪 Strength' 
-        : session.zone === 'sim' ? '🏁 Simulation' : '😴 Recovery';
+    const badgeText = session.zone === 2 ? 'Z2' : session.zone === 4 ? 'THR' 
+        : session.zone === 5 ? 'VO₂' : session.zone === 'str' ? 'STR' 
+        : session.zone === 'sim' ? 'SIM' : 'REST';
+    const modalityIcon = session.modality === 'stepper' ? '🪜' : session.modality === 'run' ? '🏃' 
+        : session.modality === 'bike' ? '🚴' : session.modality === 'gym' ? '🏋️' 
+        : session.modality === 'swim' ? '🏊' : '';
     
     return (
         <div className={`card session-card aurora grad-session`} onClick={onClick} 
             style={{ border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)' }}>
-            <span className={`session-badge ${badgeClass}`}>{badgeText}</span>
-            <p style={{ fontSize: 24, fontWeight: 600, marginBottom: 6 }}>{session.type}</p>
-            <p className="insight">
-                {session.duration > 0 ? fmt.duration(session.duration) : 'Rest day'}
-                {session.distance > 0 && ` · ${session.distance}km`}
-                {isToday && ' · Today'}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+                    {session.day}{isToday ? ' · Today' : ''}
+                </p>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    {session.duration > 0 && <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{session.duration}min</span>}
+                    <span className={`session-badge ${badgeClass}`}>{badgeText}</span>
+                </div>
+            </div>
+            <p style={{ fontSize: 22, fontWeight: 600, marginBottom: 2 }}>{modalityIcon} {session.type}</p>
+            <p className="insight" style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
+                {session.purpose?.split('.')[0]}
             </p>
         </div>
     );
@@ -1822,26 +1831,26 @@ function App() {
     // 14-MONTH PERIODIZATION (Feb 2026 → Apr 2027)
     // ============================================
     const phases = [
-        { name: 'Base 1', start: '2026-02-10', weeks: 8, focus: 'Aerobic Foundation', 
-          volStart: 25, volEnd: 35, color: 'var(--green)',
-          distribution: '80% Z2 · 5% VO₂ (strides) · 5% Progressive · 10% Strength',
-          description: 'Build consistent running habit. Easy volume + strides introduce speed. Progressive runs teach gear changes.',
-          keyWorkouts: ['Long run (build to 90min)', '4 runs/week + strides', '2× strength', 'Deload/test wk 4 & 8'] },
-        { name: 'Base 2', start: '2026-04-07', weeks: 8, focus: 'Volume + Threshold',
-          volStart: 35, volEnd: 45, color: 'var(--green)',
+        { name: 'Base 2', start: '2026-02-10', weeks: 8, focus: 'Volume + Threshold',
+          volStart: 30, volEnd: 45, color: 'var(--green)',
           distribution: '70% Z2 · 10% Threshold/Compromised · 5% VO₂ · 5% Stations · 10% Strength',
-          description: 'Introduce threshold and compromised running (alternating weeks). VO₂max sessions begin. Stations stay sharp.',
-          keyWorkouts: ['Wk A: Running threshold · Wk B: Compromised (1km+station)', 'VO₂max Sunday', 'Long run 90-100min', 'Deload/test wk 4 & 8'] },
-        { name: 'Build 1', start: '2026-06-02', weeks: 8, focus: 'VO₂max + Threshold',
+          description: 'Build volume with quality. Alternating threshold and compromised running. VO₂max every Sunday.',
+          keyWorkouts: ['Wk A: Running threshold · Wk B: Compromised (1km+station)', 'VO₂max Sunday', 'Long run 75→100min', 'Deload/test wk 4 & 8'] },
+        { name: 'Build 1', start: '2026-04-07', weeks: 8, focus: 'VO₂max + Threshold',
           volStart: 45, volEnd: 55, color: 'var(--orange)',
           distribution: '65% Z2 · 12% Threshold/Compromised · 10% VO₂ · 5% Stations · 8% Strength',
           description: 'Push VO₂max ceiling. Threshold continues alternating with compromised running. Peak volume building.',
           keyWorkouts: ['5×4min VO₂max', 'Alternating threshold/compromised', 'Long run 100-110min', 'Deload/test wk 4 & 8'] },
-        { name: 'Build 2', start: '2026-07-28', weeks: 8, focus: 'Peak Volume + Specificity',
+        { name: 'Build 2', start: '2026-06-02', weeks: 8, focus: 'Peak Volume + Specificity',
           volStart: 50, volEnd: 60, color: 'var(--orange)',
           distribution: '65% Z2 · 12% Threshold/Compromised · 12% VO₂ · 3% Stations · 8% Strength',
           description: 'Highest volume block. Push weekly km toward 60. Engine gets built here.',
           keyWorkouts: ['Long run 110-120min', '2 quality sessions/week', 'Compromised running focus', 'Deload/test wk 4 & 8'] },
+        { name: 'Build 3', start: '2026-07-28', weeks: 8, focus: 'Sustained Peak + Race Prep',
+          volStart: 55, volEnd: 60, color: 'var(--orange)',
+          distribution: '62% Z2 · 12% Threshold/Compromised · 12% VO₂ · 6% Stations · 8% Strength',
+          description: 'Sustain peak volume. Second block at 55-60km. This is where the aerobic ceiling really shifts.',
+          keyWorkouts: ['Long run 110-120min', 'Compromised running weekly', '2 quality sessions/week', 'Deload/test wk 4 & 8'] },
         { name: 'Race Specific', start: '2026-09-22', weeks: 8, focus: 'HYROX-Specific',
           volStart: 50, volEnd: 50, color: 'var(--red)',
           distribution: '55% Z2 · 10% Threshold · 10% VO₂ · 10% Compromised · 5% Str · 10% Sim',
@@ -1940,99 +1949,78 @@ function App() {
         // ═══ FALLBACK: Hardcoded plans (used if sheet not available) ═══
         // 4-week cycle: Wk 1-3 normal, Wk 4 deload/test (60% volume)
         
-        if (phase === 'Base 1') {
-            if (isDeload) return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume. Keep easy.' },
-                { day: 'Tuesday', type: 'Strength A: Push (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['Hex Bar Squat: 2×5 @100kg', 'DB Floor Press: 2×5 @24kg', 'DB Lunges: 2×5/5 @22kg', 'Core: 1 set', '8s Sprints × 3'] },
-                { day: 'Wednesday', type: '2km Time Trial', zone: 5, duration: 25, distance: 4, purpose: 'TEST: 2km TT. Warm up 10min, all-out 2km, cool down.', structure: [{ block: 'Warm-up', time: '10 min', note: 'Easy + 3 strides' }, { block: '2km TT', time: '~9 min', note: 'ALL OUT — track your time' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery after TT.' },
-                { day: 'Friday', type: 'Strength B: Pull (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets. Keep loads moderate.', exercises: ['Hex Bar DL: 2×5 @110kg', 'KB Row: 2×6/6 @32kg', 'KB Swing: 2×8 @32kg', 'Core: 1 set', '8s Sprints × 3'] },
-                { day: 'Saturday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Easy shake-out. Shorter than normal long run.' },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Recover for next cycle.' }
-            ];
-            return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base building. Conversational pace.' },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['Hex Bar Squat: 3×5 @120kg', 'DB Floor Press: 3×5 @28kg', 'DB Lunges: 3×5/5 @28kg', 'DB Squat Jumps: 3×6 @16kg', 'Cable Rotations: 3×8/8', 'Standing Calf Raise: 3×6/6', '8s Sprints × 4'] },
-                { day: 'Wednesday', type: 'Progressive Run', zone: 2, duration: 50, distance: 8, purpose: 'Easy 35min → last 15min at tempo feel. Teaching gear change.', structure: [{ block: 'Easy', time: '35 min', note: 'Conversational' }, { block: 'Progressive', time: '15 min', note: 'Build to comfortably hard' }] },
-                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, purpose: 'Easy run. Last 8min: 6×30s strides at 90% effort, 60s walk recovery.', structure: [{ block: 'Easy run', time: '37 min', note: 'Conversational' }, { block: 'Strides', time: '8 min', note: '6×30s fast, 60s walk between' }] },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['Hex Bar Deadlift: 3×5 @130kg', 'KB Row: 3×6/6 @32kg', 'KB Swing: 3×8 @32kg', 'Cleans: 3×5 @60kg', 'Hurricane Slams: 3×6/6', 'Seated Calf Raise: 3×8', '8s Sprints × 4'] },
-                { day: 'Saturday', type: 'Long Run', zone: 2, duration: 75, distance: 12, purpose: 'Time on feet. Build 5min/week to 90min.' },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Recovery is where adaptation happens.' }
-            ];
-        }
-        
         if (phase === 'Base 2') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume.' },
-                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise. Movement quality.'] },
-                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery after test.' },
-                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }] },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.' },
+                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['2 sets per exercise.'] },
+                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery after test.' },
+                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }] },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' }
             ];
             return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic base. Morning Z2.' },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab — alternates Week A/B'] },
-                { day: 'Wednesday', type: isWeekA ? 'Running Threshold' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 7 : 6, purpose: isWeekA ? 'Pure running threshold. Clean data for tracking.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, purpose: 'Easy run + 6×30s strides at end.' },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab — alternates Week A/B'] },
-                { day: 'Saturday', type: 'Long Run', zone: 2, duration: 90, distance: 14, purpose: 'Build to 100min. Time on feet.' },
-                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, purpose: 'VO₂max stimulus. Push the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }] }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact. HR 130-145.' },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab — alternates Week A/B'] },
+                { day: 'Wednesday', type: isWeekA ? 'Running Threshold' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 7 : 6, modality: 'run', purpose: isWeekA ? 'Pure running threshold. Clean data for tracking.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, modality: 'run', purpose: 'Maintain running mechanics. 6×30s strides at end for neuromuscular.' },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab — alternates Week A/B'] },
+                { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: 90, distance: 0, modality: 'stepper', purpose: 'Big aerobic session. Zero impact. Build to 100min+.' },
+                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, modality: 'run', purpose: 'VO₂max stimulus. Push the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }] }
             ];
         }
         
-        if (phase === 'Build 1' || phase === 'Build 2') {
+        if (phase === 'Build 1' || phase === 'Build 2' || phase === 'Build 3') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK — 60% volume.' },
-                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, purpose: 'TEST: Alternate each deload week.' },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery.' },
-                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 45, distance: 4, purpose: 'TEST: 4×(1km + station). Rotate station focus: ski erg → sled push → row → farmer carry.' },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.' },
+                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate each deload week.' },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery.' },
+                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
+                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 45, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + station). Rotate: ski erg → sled push → row → farmer carry.' },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' }
             ];
             return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Aerobic volume.' },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab'] },
-                { day: 'Wednesday', type: isWeekA ? 'Threshold Intervals' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 8 : 6, purpose: isWeekA ? 'Threshold repeats. Clean running data.' : 'Compromised: 4×(1km threshold + station). Priority: ski erg, sled push.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '25 min', note: '4×8min threshold (2min jog)' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + ski erg 500m or sled 4×25m' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 50, distance: 8, purpose: 'Recovery volume.' },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab'] },
-                { day: 'Saturday', type: 'Long Run', zone: 2, duration: phase === 'Build 1' ? 100 : 115, distance: phase === 'Build 1' ? 16 : 18, purpose: phase === 'Build 1' ? 'Build to 110min.' : 'Peak long run 110-120min.' },
-                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 40, distance: 6, purpose: 'VO₂max session. Expand the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '20 min', note: '5×4min hard (3min jog)' }, { block: 'Cool-down', time: '10 min' }] }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact.' },
+                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: ['See Strength A tab'] },
+                { day: 'Wednesday', type: isWeekA ? 'Threshold Intervals' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 8 : 6, modality: 'run', purpose: isWeekA ? 'Threshold repeats. Clean running data.' : 'Compromised: 4×(1km threshold + station). Priority: ski erg, sled push.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '25 min', note: '4×8min threshold (2min jog)' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + ski erg 500m or sled 4×25m' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 50, distance: 8, modality: 'run', purpose: 'Maintain running mechanics. Strides for neuromuscular.' },
+                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: ['See Strength B tab'] },
+                { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: phase === 'Build 1' ? 100 : 115, distance: 0, modality: 'stepper', purpose: phase === 'Build 1' ? 'Build to 110min. Big aerobic session.' : 'Peak long session 110-120min.' },
+                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 40, distance: 6, modality: 'run', purpose: 'VO₂max session. Expand the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '20 min', note: '5×4min hard (3min jog)' }, { block: 'Cool-down', time: '10 min' }] }
             ];
         }
         
         if (phase === 'Race Specific') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 30, distance: 5, purpose: 'DELOAD WEEK.' },
-                { day: 'Tuesday', type: 'Strength (light)', zone: 'str', duration: 40, distance: 0, purpose: '2 sets. Maintenance.', exercises: ['2 sets per exercise.'] },
-                { day: 'Wednesday', type: 'Test: Compromised Run', zone: 4, duration: 50, distance: 6, purpose: 'TEST: 4×(1km + station). Track splits + total time vs previous.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km + rotating stations' }] },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Recovery.' },
-                { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest.' },
-                { day: 'Saturday', type: 'Race Simulation', zone: 'sim', duration: 80, distance: 8, purpose: 'Full sim: 8×(1km + station). Race effort.', structure: [{ block: 'Full simulation', time: '60-80 min', note: '8 rounds at race pace' }] },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest after sim.' }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK.' },
+                { day: 'Tuesday', type: 'Strength (light)', zone: 'str', duration: 40, distance: 0, modality: 'gym', purpose: '2 sets. Maintenance.', exercises: ['2 sets per exercise.'] },
+                { day: 'Wednesday', type: 'Test: Compromised Run', zone: 4, duration: 50, distance: 6, modality: 'run', purpose: 'TEST: 4×(1km + station). Track splits + total time vs previous.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km + rotating stations' }] },
+                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery.' },
+                { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' },
+                { day: 'Saturday', type: 'Race Simulation', zone: 'sim', duration: 80, distance: 8, modality: 'run', purpose: 'Full sim: 8×(1km + station). Race effort.', structure: [{ block: 'Full simulation', time: '60-80 min', note: '8 rounds at race pace' }] },
+                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest after sim.' }
             ];
             return [
-                { day: 'Monday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery from weekend.' },
-                { day: 'Tuesday', type: 'Strength A (reduced)', zone: 'str', duration: 50, distance: 0, purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
-                { day: 'Wednesday', type: 'Compromised Running', zone: 4, duration: 50, distance: 6, purpose: 'Every week now: 4×(1km threshold + station). This IS the race.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km + station (rotate ski/sled/row/carry)' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 45, distance: 7, purpose: 'Recovery.' },
-                { day: 'Friday', type: 'Strength B (reduced)', zone: 'str', duration: 50, distance: 0, purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
-                { day: 'Saturday', type: isWeekA ? 'Long Run' : 'Race Simulation', zone: isWeekA ? 2 : 'sim', duration: isWeekA ? 80 : 80, distance: 8, purpose: isWeekA ? 'Maintain aerobic base.' : 'Full or half sim. Every 2 weeks.', structure: isWeekA ? undefined : [{ block: 'Simulation', time: '60-80 min', note: '4-8 rounds: 1km + station' }] },
-                { day: 'Sunday', type: 'VO₂max / Sharp Session', zone: 5, duration: 35, distance: 5, purpose: 'Keep ceiling high. Short and sharp.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15 min', note: '6×2min hard (90s jog)' }, { block: 'Cool-down', time: '10 min' }] }
+                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 45, distance: 0, modality: 'stepper', purpose: 'Recovery from weekend. Zero impact.' },
+                { day: 'Tuesday', type: 'Strength A (reduced)', zone: 'str', duration: 50, distance: 0, modality: 'gym', purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
+                { day: 'Wednesday', type: 'Compromised Running', zone: 4, duration: 50, distance: 6, modality: 'run', purpose: 'Every week: 4×(1km threshold + station). This IS the race.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km + station (rotate ski/sled/row/carry)' }, { block: 'Cool-down', time: '5 min' }] },
+                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, modality: 'run', purpose: 'Maintain running mechanics.' },
+                { day: 'Friday', type: 'Strength B (reduced)', zone: 'str', duration: 50, distance: 0, modality: 'gym', purpose: 'Strength maintenance. 2 sets.', exercises: ['2 sets per exercise + 8s Sprints × 4'] },
+                { day: 'Saturday', type: isWeekA ? 'Long Z2 Stepper' : 'Race Simulation', zone: isWeekA ? 2 : 'sim', duration: 80, distance: isWeekA ? 0 : 8, modality: isWeekA ? 'stepper' : 'run', purpose: isWeekA ? 'Maintain aerobic base. Zero impact.' : 'Full or half sim. Every 2 weeks.' , structure: isWeekA ? undefined : [{ block: 'Simulation', time: '60-80 min', note: '4-8 rounds: 1km + station' }] },
+                { day: 'Sunday', type: 'VO₂max / Sharp Session', zone: 5, duration: 35, distance: 5, modality: 'run', purpose: 'Keep ceiling high. Short and sharp.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15 min', note: '6×2min hard (90s jog)' }, { block: 'Cool-down', time: '10 min' }] }
             ];
         }
         
         // Peak + Taper
         return [
-            { day: 'Monday', type: 'Easy Run', zone: 2, duration: 35, distance: 5, purpose: 'Reduced volume. Stay loose.' },
-            { day: 'Tuesday', type: 'Light Strength', zone: 'str', duration: 30, distance: 0, purpose: 'Movement quality only. 2 sets each.', exercises: ['Hex DL: 2×3 @100kg', 'Bodyweight squats', 'Light carries', 'Core: 1 set'] },
-            { day: 'Wednesday', type: 'Short Sharp Session', zone: 4, duration: 30, distance: 4, purpose: 'Keep engine primed.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Threshold', time: '10 min', note: '2×5min' }, { block: 'Cool-down', time: '10 min' }] },
-            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 30, distance: 4, purpose: 'Gentle shakeout.' },
-            { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Full rest. Hydrate. Sleep.' },
-            { day: 'Saturday', type: 'Shakeout + Strides', zone: 2, duration: 20, distance: 3, purpose: 'Light run with strides. Stay sharp.' },
-            { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, purpose: 'Race week rest.' }
+            { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 35, distance: 0, modality: 'stepper', purpose: 'Reduced volume. Stay loose.' },
+            { day: 'Tuesday', type: 'Light Strength', zone: 'str', duration: 30, distance: 0, modality: 'gym', purpose: 'Movement quality only. 2 sets each.', exercises: ['Hex DL: 2×3 @100kg', 'Bodyweight squats', 'Light carries', 'Core: 1 set'] },
+            { day: 'Wednesday', type: 'Short Sharp Session', zone: 4, duration: 30, distance: 4, modality: 'run', purpose: 'Keep engine primed.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Threshold', time: '10 min', note: '2×5min' }, { block: 'Cool-down', time: '10 min' }] },
+            { day: 'Thursday', type: 'Easy Run', zone: 2, duration: 30, distance: 4, modality: 'run', purpose: 'Gentle shakeout.' },
+            { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest. Hydrate. Sleep.' },
+            { day: 'Saturday', type: 'Shakeout + Strides', zone: 2, duration: 20, distance: 3, modality: 'run', purpose: 'Light run with strides. Stay sharp.' },
+            { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Race week rest.' }
         ];
     };
     
@@ -2418,7 +2406,9 @@ function App() {
                                         <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
                                             {session.day}{session.day === todayName && ' · Today'}
                                         </p>
-                                        <p style={{ fontWeight: 500 }}>{session.type}</p>
+                                        <p style={{ fontWeight: 500 }}>
+                                            {session.modality === 'stepper' ? '🪜 ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '🏋️ ' : ''}{session.type}
+                                        </p>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                         {session.duration > 0 && (
