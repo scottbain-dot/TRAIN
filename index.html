@@ -703,13 +703,25 @@ const hrEngine = {
         const type = (workout['Workout Type'] || '').toLowerCase();
         const avgHR = parseFloat(workout['Avg HR']) || 0;
         const dur = parseFloat(workout['Duration (min)']) || 0;
+        const maxHR = parseFloat(workout['Max HR']) || 0;
         
         // Skip walks and very short sessions
         if (type.includes('walk') && dur < 25) return { zone: 1, category: 'walk' };
         if (dur < 3) return { zone: 1, category: 'micro' };
         
-        // Strength sessions — separate category
+        // Strength sessions — BUT check if it's actually a high-intensity cardio session
+        // recorded as "Functional Strength" (e.g. HYROX sim, CrossFit-style WOD)
+        // True strength: moderate avg HR, big max-avg spread (spikes on sets, drops on rest)
+        // Cardio disguised as strength: high sustained avg HR (>145), long duration (>20min)
         if (type.includes('strength') || type.includes('functional') || type.includes('traditional')) {
+            const isHighIntensityCardio = avgHR > 145 && dur > 20;
+            const isModerateSustained = avgHR > 135 && dur > 40 && maxHR > 0 && (avgHR / maxHR) > 0.85;
+            
+            if (isHighIntensityCardio || isModerateSustained) {
+                // This is really a cardio/HYROX session recorded as functional strength
+                const zone = hrEngine.classify(avgHR);
+                return { zone, category: 'cardio', avgHR, reclassified: true };
+            }
             return { zone: 'str', category: 'strength', avgHR };
         }
         
@@ -743,6 +755,7 @@ const hrEngine = {
     },
     
     // Compute weekly zone distribution from an array of workouts
+    // Uses Max HR vs Avg HR spread to estimate zone time within interval sessions
     weeklyZones: (workouts) => {
         const zones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0, str: 0 };
         const details = [];
@@ -751,13 +764,59 @@ const hrEngine = {
             const dur = parseFloat(w['Duration (min)']) || 0;
             if (dur <= 0) return;
             
+            // ═══ PRIORITY 1: Manual zone data from sheet ═══
+            const z1m = parseFloat(w['Z1 min']) || 0;
+            const z2m = parseFloat(w['Z2 min']) || 0;
+            const z3m = parseFloat(w['Z3 min']) || 0;
+            const z4m = parseFloat(w['Z4 min']) || 0;
+            const z5m = parseFloat(w['Z5 min']) || 0;
+            const hasManualZones = (z1m + z2m + z3m + z4m + z5m) > 0;
+            
+            if (hasManualZones) {
+                zones.z1 += z1m; zones.z2 += z2m; zones.z3 += z3m; zones.z4 += z4m; zones.z5 += z5m;
+                // Any remaining time goes to strength bucket
+                const zoneTotal = z1m + z2m + z3m + z4m + z5m;
+                if (dur - zoneTotal > 2) zones.str += (dur - zoneTotal);
+                const primaryZone = z5m > 0 ? 5 : z4m > 0 ? 4 : z3m > 0 ? 3 : z2m > 0 ? 2 : 1;
+                details.push({ zone: primaryZone, category: 'manual', dur, type: w['Workout Type'], date: w['Date'], manual: true });
+                return;
+            }
+            
+            // ═══ PRIORITY 2: Classification + estimation ═══
             const classified = hrEngine.classifyWorkout(w);
             if (classified.zone === 'str') {
                 zones.str += dur;
-            } else if (classified.zone >= 1 && classified.zone <= 5) {
-                zones[`z${classified.zone}`] += dur;
+                details.push({ ...classified, dur, type: w['Workout Type'], date: w['Date'] });
+                return;
             }
-            details.push({ ...classified, dur, type: w['Workout Type'], date: w['Date'] });
+            
+            // Enhanced zone estimation: if we have both Max and Avg HR, estimate zone split
+            const avgHR = parseFloat(w['Avg HR']) || 0;
+            const maxHR = parseFloat(w['Max HR']) || 0;
+            const spread = maxHR - avgHR;
+            
+            if (avgHR > 0 && maxHR > 0 && spread > 15 && dur > 10) {
+                // Interval-like session: spread > 15bpm means variable intensity
+                const workHR = Math.round((maxHR + avgHR) / 2);
+                const restHR = Math.max(90, Math.round(2 * avgHR - maxHR));
+                const workFraction = Math.min(0.7, Math.max(0.2, (avgHR - restHR) / (maxHR - restHR)));
+                
+                const workZone = hrEngine.classify(workHR);
+                const restZone = hrEngine.classify(restHR);
+                
+                const workMins = dur * workFraction;
+                const restMins = dur * (1 - workFraction);
+                
+                if (workZone >= 1 && workZone <= 5) zones[`z${workZone}`] += workMins;
+                if (restZone >= 1 && restZone <= 5) zones[`z${restZone}`] += restMins;
+                
+                details.push({ ...classified, dur, type: w['Workout Type'], date: w['Date'], 
+                    estimated_split: true, workZone, restZone, workFraction: Math.round(workFraction * 100) });
+            } else if (classified.zone >= 1 && classified.zone <= 5) {
+                // Steady-state session or no Max HR data: assign all time to avg zone
+                zones[`z${classified.zone}`] += dur;
+                details.push({ ...classified, dur, type: w['Workout Type'], date: w['Date'] });
+            }
         });
         
         const totalCardio = zones.z1 + zones.z2 + zones.z3 + zones.z4 + zones.z5;
@@ -791,15 +850,24 @@ const hrEngine = {
     },
     
     // Compute Acute:Chronic Training Load ratio (fatigue vs fitness)
-    // Acute = 7-day TRIMP avg, Chronic = 28-day TRIMP avg
+    // Acute = 7-day TRIMP avg, Chronic = 28-day TRIMP avg (or actual days available)
     acwr: (workouts, restHR) => {
         const today = new Date();
+        const cutoff7 = new Date(today.getTime() - 7 * 86400000);
+        const cutoff28 = new Date(today.getTime() - 28 * 86400000);
+        
         const acute7 = workouts
-            .filter(w => new Date(w['Date']) >= new Date(today.getTime() - 7 * 86400000))
+            .filter(w => new Date(w['Date']) >= cutoff7)
             .reduce((s, w) => s + hrEngine.trimp(w, restHR), 0) / 7;
-        const chronic28 = workouts
-            .filter(w => new Date(w['Date']) >= new Date(today.getTime() - 28 * 86400000))
-            .reduce((s, w) => s + hrEngine.trimp(w, restHR), 0) / 28;
+        
+        // For chronic: use actual days of data available (min 14 days for meaningful ratio)
+        const chronic28Workouts = workouts.filter(w => new Date(w['Date']) >= cutoff28);
+        const chronicTrimp = chronic28Workouts.reduce((s, w) => s + hrEngine.trimp(w, restHR), 0);
+        // Count actual calendar days spanned by the data
+        const allDates = workouts.map(w => w['Date']).filter(Boolean);
+        const earliest = allDates.length > 0 ? new Date(allDates.sort()[0]) : today;
+        const daysOfData = Math.min(28, Math.max(7, Math.ceil((today - earliest) / 86400000)));
+        const chronic28 = chronicTrimp / daysOfData;
         
         const ratio = chronic28 > 0 ? acute7 / chronic28 : 1;
         let status = 'optimal';
@@ -852,8 +920,9 @@ const hrEngine = {
                 const dist = parseFloat(w['Distance (km)']) || 0;
                 const hr = parseFloat(w['Avg HR']) || 0;
                 const dur = parseFloat(w['Duration (min)']) || 0;
-                // Only include real running sessions with pace & HR data
-                return (type.includes('run') || type.includes('jog')) && dist > 1 && hr > 0 && dur > 10;
+                // Only include easy/moderate running sessions (Z2-Z3, HR < 155) to compare like with like
+                // Exclude short intervals and threshold sessions for meaningful aerobic efficiency tracking
+                return (type.includes('run') || type.includes('jog')) && dist > 3 && hr > 100 && hr < 155 && dur > 20;
             })
             .map(w => ({
                 date: w['Date'],
@@ -918,26 +987,32 @@ const hrEngine = {
     // ═══ SESSION RECOMMENDATION based on readiness + training history ═══
     // Uses HRV, RHR, sleep, and recent training load to suggest intensity
     sessionRecommendation: (readinessScore, acwr, yesterdayZone) => {
-        // High readiness (80+) + optimal/low ACWR = go hard
-        // Low readiness (<60) or high ACWR (>1.3) = easy day
-        // Medium readiness + rest yesterday = moderate-hard OK
+        // Primary signal: readiness score (which already integrates HRV, RHR, sleep, training load)
+        // Secondary signal: ACWR and yesterday's training for additional context
+        // The recommendation should NEVER contradict the readiness message
         
-        if (readinessScore >= 80 && (!acwr || acwr.ratio <= 1.2)) {
+        // High readiness (75+) = body is ready, follow your plan
+        if (readinessScore >= 80) {
             if (yesterdayZone === 'str' || yesterdayZone === 1 || !yesterdayZone) {
                 return { intensity: 'high', msg: 'Body is primed. Great day for threshold or VO₂max work.', color: 'red' };
             }
-            return { intensity: 'moderate', msg: 'Good readiness but trained hard recently. Z2 or moderate strength.', color: 'blue' };
+            return { intensity: 'moderate-high', msg: 'Good readiness. Follow your plan — can handle intensity today.', color: 'blue' };
         }
         
-        if (readinessScore < 55 || (acwr && acwr.ratio > 1.4)) {
-            return { intensity: 'recovery', msg: 'Recovery day recommended. Walk, mobility, or complete rest.', color: 'green' };
+        if (readinessScore >= 70) {
+            // Good readiness — only flag if ACWR is genuinely extreme (>1.5)
+            if (acwr && acwr.ratio > 1.5) {
+                return { intensity: 'moderate', msg: 'Readiness is good but training load has been high. Follow plan but monitor fatigue.', color: 'blue' };
+            }
+            return { intensity: 'train as planned', msg: 'Good recovery. Follow your plan today.', color: 'blue' };
         }
         
-        if (readinessScore < 70 || (acwr && acwr.ratio > 1.3)) {
-            return { intensity: 'easy', msg: 'Keep it easy today. Z2 aerobic or light strength.', color: 'green' };
+        if (readinessScore >= 60) {
+            return { intensity: 'easy', msg: 'Below baseline readiness. Z2 aerobic or light strength — save intensity for a better day.', color: 'green' };
         }
         
-        return { intensity: 'moderate', msg: 'Moderate day. Follow your plan — body can handle it.', color: 'blue' };
+        // Low readiness (<60) = recovery regardless of plan
+        return { intensity: 'recovery', msg: 'Recovery recommended. Walk, mobility, or complete rest. Your body needs it.', color: 'green' };
     },
     
     // ═══ HR RECOVERY QUALITY ═══
@@ -1081,6 +1156,12 @@ const fetchSheet = async (sheetId, tabName) => {
                         ? Math.round(3600 / parseFloat(w['Avg Speed (km/hr)'])) : 0,
                     'Flights Climbed': w['Flights Climbed (count)'] || 0,
                     'Step Count': w['Step Count (count)'] || 0,
+                    // Manual zone data columns (added by user after workouts)
+                    'Z1 min': w['Z1 min'] || '',
+                    'Z2 min': w['Z2 min'] || '',
+                    'Z3 min': w['Z3 min'] || '',
+                    'Z4 min': w['Z4 min'] || '',
+                    'Z5 min': w['Z5 min'] || '',
                     '_raw': w // Keep original data accessible
                 };
             });
@@ -2817,7 +2898,13 @@ function App() {
         
         console.log('[TRIMP Debug]', { trimpYesterday: trimpYesterday.toFixed(1), trimpAvg7: trimpAvg7.toFixed(1), yesterdayWorkoutCount: yesterdayWorkouts.length, last7WorkoutCount: last7Workouts.length });
         console.log('[ACWR Debug]', { acute: acwr.acute.toFixed(1), chronic: acwr.chronic.toFixed(1), ratio: acwr.ratio.toFixed(2), status: acwr.status });
-        console.log('[Zone Distribution]', { easy: `${weekZones.easy.pct.toFixed(0)}%`, tempo: `${weekZones.tempo.pct.toFixed(0)}%`, hard: `${weekZones.hard.pct.toFixed(0)}%`, polarized: weekZones.isPolarized, totalCardioMin: Math.round(weekZones.totalCardio) });
+        console.log('[Zone Distribution]', { 
+            easy: `${weekZones.easy.pct.toFixed(0)}%`, tempo: `${weekZones.tempo.pct.toFixed(0)}%`, hard: `${weekZones.hard.pct.toFixed(0)}%`, 
+            polarized: weekZones.isPolarized, totalCardioMin: Math.round(weekZones.totalCardio),
+            z1: Math.round(weekZones.zones.z1), z2: Math.round(weekZones.zones.z2), z3: Math.round(weekZones.zones.z3), 
+            z4: Math.round(weekZones.zones.z4), z5: Math.round(weekZones.zones.z5), str: Math.round(weekZones.zones.str)
+        });
+        console.log('[Zone Details]', weekZones.details?.map(d => `${d.date} ${d.type}: Z${d.zone} ${Math.round(d.dur)}min${d.estimated_split ? ` (split: Z${d.workZone}/${d.workFraction}% + Z${d.restZone})` : ''}${d.reclassified ? ' [reclassified]' : ''}`));
         console.log('[HRV Balance Debug]', { hrvAvg14: hrvAvg14.toFixed(1), hrvBaseline60: hrvBaseline60.toFixed(1), hrvTrend3d: hrvTrend3d.toFixed(1), hrv14Count: hrv14.length, hrv60Count: hrv60.length });
         
         // VO2 and volume history
