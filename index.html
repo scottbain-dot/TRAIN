@@ -615,26 +615,27 @@ const CONFIG = {
     profile: { name: 'Lad', hrBaseline: 55, raceDate: '2027-04-15', raceName: 'Malaga', age: 42 },
     
     // ═══ HEART RATE ZONES ═══
-    // Based on actual observed max HR of 183 (from HYROX race data)
-    // Zones use % of max HR — standard 5-zone model
+    // Matched to Apple Watch zones (HRR method, auto-calculated)
+    // Actual max HR: 183 (HYROX race data). Apple uses 179 for zone calc.
+    // Manual zone data from Apple Fitness takes priority over estimation.
     maxHR: 183,
     hrZones: {
-        z1: { name: 'Recovery',   min: 0,   max: 0.60, color: 'var(--text-tertiary)', label: 'Z1' },  // <110
-        z2: { name: 'Aerobic',    min: 0.60, max: 0.76, color: 'var(--green)',         label: 'Z2' },  // 110-139
-        z3: { name: 'Tempo',      min: 0.76, max: 0.87, color: 'var(--blue)',          label: 'Z3' },  // 139-159
-        z4: { name: 'Threshold',  min: 0.87, max: 0.93, color: 'var(--orange)',        label: 'Z4' },  // 159-170
-        z5: { name: 'VO₂max',     min: 0.93, max: 1.00, color: 'var(--red)',           label: 'Z5' },  // 170-183
+        z1: { name: 'Recovery',   min: 0,    max: 0.705, color: 'var(--text-tertiary)', label: 'Z1' },  // <129
+        z2: { name: 'Aerobic',    min: 0.705, max: 0.776, color: 'var(--green)',         label: 'Z2' },  // 130-141
+        z3: { name: 'Tempo',      min: 0.776, max: 0.841, color: 'var(--blue)',          label: 'Z3' },  // 142-153
+        z4: { name: 'Threshold',  min: 0.841, max: 0.907, color: 'var(--orange)',        label: 'Z4' },  // 154-165
+        z5: { name: 'VO₂max',     min: 0.907, max: 1.00,  color: 'var(--red)',           label: 'Z5' },  // 166+
     },
     // Polarized targets: 80/0/20 (Z1-2 / Z3 / Z4-5)
     polarizedTarget: { easy: 80, tempo: 0, hard: 20 },
     
-    // Session-specific HR targets
+    // Session-specific HR targets (updated to match Apple zones)
     sessionHR: {
-        z2Stepper:    { target: 133, range: [127, 140], note: 'Steady state. Should feel easy. Can hold a conversation.' },
-        z2Run:        { target: 140, range: [133, 145], note: 'Easy effort. Nasal breathing. Build aerobic base.' },
-        threshold:    { target: 165, range: [159, 172], note: 'Comfortably hard. Race pace effort.' },
-        vo2max:       { target: 175, range: [170, 183], note: 'Hard intervals. Max sustainable for 3-5 min.' },
-        compromised:  { target: 162, range: [155, 175], note: '1km repeats + stations. Avg will be lower due to transitions.' },
+        z2Stepper:    { target: 135, range: [130, 141], note: 'Steady state. Should feel easy. Can hold a conversation.' },
+        z2Run:        { target: 138, range: [130, 141], note: 'Easy effort. Nasal breathing. Build aerobic base.' },
+        threshold:    { target: 160, range: [154, 165], note: 'Comfortably hard. Race pace effort.' },
+        vo2max:       { target: 172, range: [166, 183], note: 'Hard intervals. Max sustainable for 3-5 min.' },
+        compromised:  { target: 158, range: [150, 170], note: '1km repeats + stations. Avg will be lower due to transitions.' },
         strength:     { target: null, range: [100, 150], note: 'Variable. Spikes on power moves, drops on rest.' },
     }
 };
@@ -2102,6 +2103,122 @@ const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
 };
 
 // Session Detail Modal
+// Zone Entry Modal — tap a workout, enter 5 zone values
+const ZoneEntryModal = ({ workout, onClose, onSave }) => {
+    const [zones, setZones] = useState(() => {
+        const key = `${workout['Date']}|${workout['Workout Type']}`;
+        const stored = storage.get('zones', {});
+        return stored[key] || { z1: '', z2: '', z3: '', z4: '', z5: '' };
+    });
+    
+    const handleSave = () => {
+        const key = `${workout['Date']}|${workout['Workout Type']}`;
+        const allZones = storage.get('zones', {});
+        allZones[key] = {
+            z1: parseFloat(zones.z1) || 0,
+            z2: parseFloat(zones.z2) || 0,
+            z3: parseFloat(zones.z3) || 0,
+            z4: parseFloat(zones.z4) || 0,
+            z5: parseFloat(zones.z5) || 0
+        };
+        storage.set('zones', allZones);
+        onSave();
+        onClose();
+    };
+    
+    const handleDelete = () => {
+        const key = `${workout['Date']}|${workout['Workout Type']}`;
+        const allZones = storage.get('zones', {});
+        delete allZones[key];
+        storage.set('zones', allZones);
+        onSave();
+        onClose();
+    };
+    
+    const dur = parseFloat(workout['Duration (min)']) || 0;
+    const avgHR = parseFloat(workout['Avg HR']) || 0;
+    const maxHR = parseFloat(workout['Max HR']) || 0;
+    const classified = hrEngine.classifyWorkout(workout);
+    const total = (parseFloat(zones.z1) || 0) + (parseFloat(zones.z2) || 0) + (parseFloat(zones.z3) || 0) + (parseFloat(zones.z4) || 0) + (parseFloat(zones.z5) || 0);
+    const hasData = total > 0;
+    
+    const zoneColors = ['var(--text-tertiary)', 'var(--green)', 'var(--blue)', 'var(--orange)', 'var(--red)'];
+    const zoneLabels = ['Z1 (<129)', 'Z2 (130-141)', 'Z3 (142-153)', 'Z4 (154-165)', 'Z5 (166+)'];
+    
+    return (
+        <div className="modal-overlay open" onClick={onClose}>
+            <div className="modal-sheet hide-scrollbar" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh' }}>
+                <div className="modal-handle" />
+                <div style={{ padding: 24 }}>
+                    <button className="modal-back" onClick={onClose}>‹</button>
+                    <p className="label" style={{ marginBottom: 4 }}>ENTER ZONE DATA</p>
+                    <p style={{ fontSize: 18, fontWeight: 600, marginBottom: 4 }}>{workout['Workout Type']}</p>
+                    <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 4 }}>{workout['Date']} · {Math.round(dur)} min</p>
+                    {avgHR > 0 && (
+                        <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                            Avg HR: {avgHR} · Max HR: {maxHR || '—'} · Estimated: Z{classified.zone === 'str' ? 'STR' : classified.zone}
+                        </p>
+                    )}
+                    
+                    <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {[1,2,3,4,5].map(z => (
+                            <div key={z} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                <div style={{ width: 10, height: 10, borderRadius: 5, background: zoneColors[z-1], flexShrink: 0 }} />
+                                <p style={{ fontSize: 13, color: 'var(--text-secondary)', width: 100, flexShrink: 0 }}>{zoneLabels[z-1]}</p>
+                                <input 
+                                    type="number" 
+                                    inputMode="numeric"
+                                    placeholder="0"
+                                    value={zones[`z${z}`]}
+                                    onChange={e => setZones({...zones, [`z${z}`]: e.target.value})}
+                                    style={{ 
+                                        flex: 1, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)',
+                                        fontSize: 16, fontWeight: 600, background: 'var(--card-elevated)', 
+                                        color: 'var(--text-primary)', textAlign: 'center', maxWidth: 80
+                                    }}
+                                />
+                                <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>min</span>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    {total > 0 && (
+                        <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
+                            <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
+                                {[1,2,3,4,5].map(z => {
+                                    const mins = parseFloat(zones[`z${z}`]) || 0;
+                                    if (mins <= 0) return null;
+                                    return <div key={z} style={{ width: `${(mins/total)*100}%`, background: zoneColors[z-1] }} />;
+                                })}
+                            </div>
+                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                                Total: {Math.round(total)} min {dur > 0 ? `(session: ${Math.round(dur)} min)` : ''}
+                            </p>
+                        </div>
+                    )}
+                    
+                    <div style={{ marginTop: 20, display: 'flex', gap: 10 }}>
+                        <button onClick={handleSave} style={{ 
+                            flex: 1, padding: '14px 20px', borderRadius: 12, border: 'none',
+                            background: 'var(--blue)', color: 'white', fontSize: 16, fontWeight: 600, cursor: 'pointer'
+                        }}>
+                            Save zones
+                        </button>
+                        {hasData && (
+                            <button onClick={handleDelete} style={{ 
+                                padding: '14px 16px', borderRadius: 12, border: '1px solid var(--border)',
+                                background: 'transparent', color: 'var(--red)', fontSize: 14, cursor: 'pointer'
+                            }}>
+                                Clear
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const SessionModal = ({ session, onClose }) => (
     <div className="modal-overlay open" onClick={onClose}>
         <div className="modal-sheet hide-scrollbar" onClick={e => e.stopPropagation()}>
@@ -2430,6 +2547,7 @@ const TestModal = ({ type, onClose, onSave }) => {
 function App() {
     const [tab, setTab] = useState('home');
     const [modal, setModal] = useState(null);
+    const [zoneVersion, setZoneVersion] = useState(0); // Incremented when zone data is saved to trigger recalc
     const [testModal, setTestModal] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [daily, setDaily] = useState([]);
@@ -2485,32 +2603,32 @@ function App() {
     // 14-MONTH PERIODIZATION (Feb 2026 → Apr 2027)
     // ============================================
     const phases = [
-        { name: 'Base 2', start: '2026-02-10', weeks: 8, focus: 'Volume + Threshold',
+        { name: 'Base 2', start: '2026-02-24', weeks: 8, focus: 'Volume + Threshold',
           volStart: 30, volEnd: 45, color: 'var(--green)',
           distribution: '70% Z2 · 10% Threshold/Compromised · 5% VO₂ · 5% Stations · 10% Strength',
           description: 'Build volume with quality. Alternating threshold and compromised running. VO₂max every Sunday.',
           keyWorkouts: ['Wk A: Running threshold · Wk B: Compromised (1km+station)', 'VO₂max Sunday', 'Long run 75→100min', 'Deload/test wk 4 & 8'] },
-        { name: 'Build 1', start: '2026-04-07', weeks: 8, focus: 'VO₂max + Threshold',
+        { name: 'Build 1', start: '2026-04-21', weeks: 8, focus: 'VO₂max + Threshold',
           volStart: 45, volEnd: 55, color: 'var(--orange)',
           distribution: '65% Z2 · 12% Threshold/Compromised · 10% VO₂ · 5% Stations · 8% Strength',
           description: 'Push VO₂max ceiling. Threshold continues alternating with compromised running. Peak volume building.',
           keyWorkouts: ['5×4min VO₂max', 'Alternating threshold/compromised', 'Long run 100-110min', 'Deload/test wk 4 & 8'] },
-        { name: 'Build 2', start: '2026-06-02', weeks: 8, focus: 'Peak Volume + Specificity',
+        { name: 'Build 2', start: '2026-06-16', weeks: 8, focus: 'Peak Volume + Specificity',
           volStart: 50, volEnd: 60, color: 'var(--orange)',
           distribution: '65% Z2 · 12% Threshold/Compromised · 12% VO₂ · 3% Stations · 8% Strength',
           description: 'Highest volume block. Push weekly km toward 60. Engine gets built here.',
           keyWorkouts: ['Long run 110-120min', '2 quality sessions/week', 'Compromised running focus', 'Deload/test wk 4 & 8'] },
-        { name: 'Build 3', start: '2026-07-28', weeks: 8, focus: 'Sustained Peak + Race Prep',
+        { name: 'Build 3', start: '2026-08-11', weeks: 8, focus: 'Sustained Peak + Race Prep',
           volStart: 55, volEnd: 60, color: 'var(--orange)',
           distribution: '62% Z2 · 12% Threshold/Compromised · 12% VO₂ · 6% Stations · 8% Strength',
           description: 'Sustain peak volume. Second block at 55-60km. This is where the aerobic ceiling really shifts.',
           keyWorkouts: ['Long run 110-120min', 'Compromised running weekly', '2 quality sessions/week', 'Deload/test wk 4 & 8'] },
-        { name: 'Race Specific', start: '2026-09-22', weeks: 8, focus: 'HYROX-Specific',
+        { name: 'Race Specific', start: '2026-10-06', weeks: 8, focus: 'HYROX-Specific',
           volStart: 50, volEnd: 50, color: 'var(--red)',
           distribution: '55% Z2 · 10% Threshold · 10% VO₂ · 10% Compromised · 5% Str · 10% Sim',
           description: 'Running under fatigue = focus. Simulations increase. Compromised running every week. Dial in pacing.',
           keyWorkouts: ['Full sim every 2 weeks', 'Compromised running weekly', 'Race-pace 1km repeats', 'Deload/test wk 4 & 8'] },
-        { name: 'Peak + Taper', start: '2026-11-17', weeks: 4, focus: 'Taper to A-Race',
+        { name: 'Peak + Taper', start: '2026-12-01', weeks: 4, focus: 'Taper to A-Race',
           volStart: 45, volEnd: 25, color: 'var(--purple)',
           distribution: 'Reduce volume 40-50%, maintain intensity',
           description: 'Trust your training. Cut volume but keep 1-2 sharp sessions. Prioritize sleep, nutrition, recovery.',
@@ -2788,6 +2906,20 @@ function App() {
     const computedData = useMemo(() => {
         if (loading) return null;
         
+        // ═══ Merge stored zone data into workouts ═══
+        const storedZones = storage.get('zones', {});
+        workouts.forEach(w => {
+            const key = `${w['Date']}|${w['Workout Type']}`;
+            const zd = storedZones[key];
+            if (zd) {
+                w['Z1 min'] = zd.z1 || 0;
+                w['Z2 min'] = zd.z2 || 0;
+                w['Z3 min'] = zd.z3 || 0;
+                w['Z4 min'] = zd.z4 || 0;
+                w['Z5 min'] = zd.z5 || 0;
+            }
+        });
+        
         const last7 = daysAgo(7);
         const last30 = daysAgo(30);
         
@@ -2958,7 +3090,7 @@ function App() {
             historyData: { vo2History, volHistory },
             latestTests
         };
-    }, [workouts, daily, tests, loading]);
+    }, [workouts, daily, tests, loading, zoneVersion]);
     
     // Compute insight scores
     const readiness = computedData ? InsightEngine.readiness(computedData.readinessInput) : { score: 0, message: { text: 'Loading...', status: 'loading' }, components: { hr: {}, hrv: {}, sleep: {}, load: {} } };
@@ -3636,6 +3768,76 @@ function App() {
                         )}
                     </div>
                 )}
+                
+                {/* Workout Log — tap to enter zones */}
+                <div className="px-5 mt-4 mb-5 fade-up delay-4">
+                    <p className="label" style={{ marginBottom: 12 }}>WORKOUT LOG</p>
+                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 12 }}>Tap a session to enter zone data from Apple Fitness</p>
+                    {(() => {
+                        const storedZones = storage.get('zones', {});
+                        const sorted = [...filteredWorkouts].sort((a, b) => new Date(b['Date']) - new Date(a['Date']));
+                        // Group by date
+                        const grouped = {};
+                        sorted.forEach(w => {
+                            const d = w['Date'];
+                            if (!grouped[d]) grouped[d] = [];
+                            grouped[d].push(w);
+                        });
+                        
+                        return Object.entries(grouped).slice(0, 20).map(([date, sessions]) => (
+                            <div key={date} style={{ marginBottom: 12 }}>
+                                <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 6, fontWeight: 600 }}>
+                                    {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                </p>
+                                {sessions.map((w, i) => {
+                                    const key = `${w['Date']}|${w['Workout Type']}`;
+                                    const hasZones = !!storedZones[key];
+                                    const dur = parseFloat(w['Duration (min)']) || 0;
+                                    const avgHR = parseFloat(w['Avg HR']) || 0;
+                                    const classified = hrEngine.classifyWorkout(w);
+                                    const zoneColor = classified.zone === 'str' ? 'var(--orange)' : 
+                                        classified.zone >= 4 ? 'var(--red)' : classified.zone === 3 ? 'var(--blue)' : 
+                                        classified.zone === 2 ? 'var(--green)' : 'var(--text-tertiary)';
+                                    
+                                    return (
+                                        <div key={i} className="card" 
+                                            onClick={() => setModal({ type: 'zones', data: w })}
+                                            style={{ padding: '12px 16px', marginBottom: 6, cursor: 'pointer',
+                                                borderLeft: hasZones ? '3px solid var(--green)' : '3px solid var(--border)' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <div style={{ flex: 1 }}>
+                                                    <p style={{ fontSize: 14, fontWeight: 500 }}>{w['Workout Type']}</p>
+                                                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                                                        {Math.round(dur)} min{avgHR > 0 ? ` · ${Math.round(avgHR)} bpm avg` : ''}
+                                                    </p>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    {hasZones ? (
+                                                        <div style={{ display: 'flex', height: 6, width: 50, borderRadius: 3, overflow: 'hidden' }}>
+                                                            {[1,2,3,4,5].map(z => {
+                                                                const mins = storedZones[key][`z${z}`] || 0;
+                                                                const total = Object.values(storedZones[key]).reduce((s,v) => s + v, 0);
+                                                                if (mins <= 0 || total <= 0) return null;
+                                                                const colors = ['var(--text-tertiary)', 'var(--green)', 'var(--blue)', 'var(--orange)', 'var(--red)'];
+                                                                return <div key={z} style={{ width: `${(mins/total)*100}%`, background: colors[z-1] }} />;
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)', padding: '2px 8px', 
+                                                            borderRadius: 6, border: '1px dashed var(--border)' }}>+ zones</span>
+                                                    )}
+                                                    <span style={{ fontSize: 11, fontWeight: 600, color: zoneColor }}>
+                                                        {classified.zone === 'str' ? 'STR' : `Z${classified.zone}`}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ));
+                    })()}
+                </div>
             </div>
         );
     };
@@ -3703,6 +3905,13 @@ function App() {
             )}
             {modal?.type === 'volume' && (
                 <VolumeModal stats={workoutStats} targetVol={currentTargetVol} onClose={() => setModal(null)} />
+            )}
+            {modal?.type === 'zones' && modal.data && (
+                <ZoneEntryModal 
+                    workout={modal.data} 
+                    onClose={() => setModal(null)} 
+                    onSave={() => setZoneVersion(v => v + 1)}
+                />
             )}
             {testModal && (
                 <TestModal type={testModal} onClose={() => setTestModal(null)} onSave={handleTestSave} />
