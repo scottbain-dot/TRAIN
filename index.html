@@ -2723,17 +2723,18 @@ function App() {
         
         if (phase === 'Base 2') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.' },
-                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['2 sets per exercise.'] },
-                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery after test.' },
-                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }] },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' }
+                { day: 'Session 1', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.', gym: 'any' },
+                { day: 'Session 2', type: isWeekA ? 'Strength A (light)' : 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['2 sets per exercise.'], gym: 'any' },
+                { day: 'Session 3', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }], gym: 'any' },
+                { day: 'Session 4', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }], gym: 'weekend' },
+                { day: 'Flex', type: 'Z2 or Off', zone: 2, duration: 40, distance: 0, modality: 'stepper', purpose: 'Listen to your body. Z2 stepper if feeling good, full rest if not.', gym: 'any', flex: true }
             ];
+            // ═══ WEEK A: Threshold focus ═══
+            // ═══ WEEK B: Compromised running focus ═══
+            // Sessions not assigned to fixed days — arrange around your schedule
+            // HYROX-specific work (compromised, VO₂max on curve) → weekends only
             return [
-                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact. HR 130-145.', targets: { 'HR Zone': '130-145 bpm', 'RPE': '3-4 / 10', 'Cadence': '100-120 spm' } },
-                { day: 'Tuesday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: isWeekA ? [
+                { day: 'Weekday', type: isWeekA ? 'Strength A: Push' : 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: isWeekA ? 'Lower push + Upper push + Power + Sprints' : 'Lower pull + Upper pull + Power + Sprints', exercises: isWeekA ? [
                     { name: 'Hex Bar Squat', sets: '3×5', load: '125kg', note: 'Controlled eccentric, drive up', category: 'LOWER PUSH' },
                     { name: 'DB Floor Press', sets: '3×5', load: '30kg', note: 'Pause at bottom', category: 'UPPER PUSH' },
                     { name: 'DB Lunges', sets: '3×5/5', load: '28kg', note: 'Full depth, drive through heel', category: 'LOWER PUSH' },
@@ -2742,17 +2743,6 @@ function App() {
                     { name: 'Standing Calf Raise', sets: '3×6/6', load: '30kg', note: 'Pause 2s top, slow 3s lower', category: 'CALVES' },
                     { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
                 ] : [
-                    { name: 'Heavy Sled Push + Pull', sets: '4×25m', load: '65kg', note: 'Back and forward = 1 set', category: 'LOWER PUSH' },
-                    { name: 'DB Push Press', sets: '3×5/5', load: '24kg', note: 'Explosive drive from legs', category: 'UPPER PUSH' },
-                    { name: 'DB Lateral Lunge', sets: '3×5/5', load: '24kg', note: 'Full range, drive back to start', category: 'LOWER PUSH' },
-                    { name: 'Explosive Push-ups', sets: '3×6', load: 'BW', note: 'Full clap or hands leave ground', category: 'POWER' },
-                    { name: 'Plank Variations', sets: '2×45s', load: 'BW', note: 'Alternate: plank, side plank, walkout', category: 'CORE' },
-                    { name: 'Plantar Lunge Holds', sets: '3×30s/side', load: 'BW', note: 'Deep lunge, Achilles stretch', category: 'CALVES' },
-                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
-                ] },
-                { day: 'Wednesday', type: isWeekA ? 'Running Threshold' : 'Compromised Running', zone: 4, duration: isWeekA ? 45 : 50, distance: isWeekA ? 7 : 6, modality: 'run', purpose: isWeekA ? 'Pure running threshold. Clean data for tracking.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? [{ block: 'Warm-up', time: '10 min' }, { block: 'Tempo', time: '20 min', note: 'Comfortably hard' }, { block: 'Cool-down', time: '10 min' }] : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }] },
-                { day: 'Thursday', type: 'Easy Run + Strides', zone: 2, duration: 45, distance: 7, modality: 'run', purpose: 'Maintain running mechanics. 6×30s strides at end for neuromuscular.' },
-                { day: 'Friday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: isWeekA ? [
                     { name: 'Hex Bar Deadlift', sets: '3×5', load: '135kg', note: 'Reset each rep. Brace hard.', category: 'LOWER PULL' },
                     { name: 'KB Row (single arm)', sets: '3×6/6', load: '32kg', note: 'Explosive pull, controlled lower', category: 'UPPER PULL' },
                     { name: 'KB Swing', sets: '3×8', load: '32kg', note: 'Hip snap. Arms are hooks.', category: 'LOWER PULL' },
@@ -2760,17 +2750,12 @@ function App() {
                     { name: 'Hurricane Med Ball Slams', sets: '3×6/6', load: '18kg', note: 'Full rotation, slam to side', category: 'CORE' },
                     { name: 'Seated Calf Raise', sets: '3×8', load: '28kg', note: 'Pause 2s top, 3s eccentric', category: 'CALVES' },
                     { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
-                ] : [
-                    { name: 'Stiff-Legged Hex DL', sets: '3×5', load: '110kg', note: 'Slow eccentric, feel hamstrings', category: 'LOWER PULL' },
-                    { name: 'Pull-ups (varied grip)', sets: '3×6-8', load: 'BW+5kg', note: 'Change grip each set', category: 'UPPER PULL' },
-                    { name: 'SL DB Hamstring Swing', sets: '3×6/6', load: '14kg', note: 'Stiff leg, feel stretch', category: 'LOWER PULL' },
-                    { name: 'DB Single Arm Snatch', sets: '3×5/5', load: '22kg', note: 'Floor to overhead in one move', category: 'POWER' },
-                    { name: 'Farmer Carry / OH March', sets: '3×40m', load: '32kg / 2×12kg', note: 'Alternate each set', category: 'CORE' },
-                    { name: 'SL Wall Sit (on toes)', sets: '3×30s/side', load: 'BW', note: 'On toes, knee 90°', category: 'CALVES' },
-                    { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
-                ] },
-                { day: 'Saturday', type: 'Long Z2 Stepper', zone: 2, duration: 90, distance: 0, modality: 'stepper', purpose: 'Big aerobic session. Zero impact. Build to 100min+.', targets: { 'HR Zone': '130-145 bpm', 'RPE': '3-4 / 10', 'Goal': 'Build to 100min+' } },
-                { day: 'Sunday', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, modality: 'run', purpose: 'VO₂max stimulus. Push the ceiling.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }] }
+                ], gym: 'weekday' },
+                { day: 'Weekday', type: 'Threshold', zone: 4, duration: 45, distance: 0, modality: 'bike', purpose: 'Bike, rower, or treadmill intervals. Pure HR-based threshold.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '20-25 min', note: '4×5min @ Z4 (2min easy)' }, { block: 'Cool-down', time: '10 min' }], gym: 'weekday' },
+                { day: 'Weekday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact. HR 130-141.', targets: { 'HR Zone': '130-141 bpm', 'RPE': '3-4 / 10', 'Cadence': '100-120 spm' }, gym: 'any' },
+                { day: 'Weekend', type: isWeekA ? 'Z2 Long Stepper' : 'Compromised Running', zone: isWeekA ? 2 : 4, duration: isWeekA ? 75 : 50, distance: isWeekA ? 0 : 6, modality: isWeekA ? 'stepper' : 'run', purpose: isWeekA ? 'Big aerobic session. Build to 90min+.' : 'Compromised running: 1km repeats + stations. Race-specific.', structure: isWeekA ? undefined : [{ block: 'Warm-up', time: '10 min' }, { block: '4 rounds', time: '~30 min', note: '1km threshold + station (ski erg or sled)' }, { block: 'Cool-down', time: '5 min' }], gym: 'weekend' },
+                { day: 'Weekend', type: 'VO₂max Intervals', zone: 5, duration: 35, distance: 5, modality: 'run', purpose: 'VO₂max stimulus. Curve treadmill or running.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Intervals', time: '15-18 min', note: '4×3min hard (3min jog)' }, { block: 'Cool-down', time: '8 min' }], gym: 'weekend' },
+                { day: 'Flex', type: 'Z2 or Off', zone: 2, duration: 40, distance: 0, modality: 'stepper', purpose: 'Listen to your body. Z2 stepper if feeling good, full rest if not.', gym: 'any', flex: true }
             ];
         }
         
@@ -3103,8 +3088,13 @@ function App() {
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
     
-    // Today's session
-    const todaySession = weekPlan.find(s => s.day === todayName) || weekPlan[0];
+    // Today's session — handle flexible scheduling
+    const isWeekend = today.getDay() === 0 || today.getDay() === 6;
+    const todaySession = weekPlan.find(s => s.day === todayName) // Exact day match first
+        || (isWeekend 
+            ? weekPlan.find(s => s.day === 'Weekend' || s.gym === 'weekend') 
+            : weekPlan.find(s => s.day === 'Weekday' || s.gym === 'weekday'))
+        || weekPlan[0];
     
     // Enrich today's session with HR targets from the engine
     if (todaySession && !todaySession.hrTargets) {
@@ -3575,15 +3565,23 @@ function App() {
                         <p className="label">THIS WEEK</p>
                     </div>
                     <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                        {weekPlan.map((session, i) => (
+                        {weekPlan.map((session, i) => {
+                            const isToday = session.day === todayName || 
+                                (isWeekend && (session.day === 'Weekend' || session.gym === 'weekend') && session === todaySession) ||
+                                (!isWeekend && (session.day === 'Weekday' || session.gym === 'weekday') && session === todaySession);
+                            const gymLabel = session.gym === 'weekend' ? '🏟 Weekend gym' : 
+                                session.gym === 'weekday' ? '🏢 Weekday gym' : 
+                                session.flex ? '⚡ Flex' : session.day;
+                            return (
                             <div key={i} className="card" style={{ 
                                 padding: 16, cursor: 'pointer',
-                                border: session.day === todayName ? '1px solid var(--blue)' : '1px solid var(--border)'
+                                border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)',
+                                opacity: session.flex ? 0.8 : 1
                             }} onClick={() => setModal({ type: 'session', data: session })}>
                                 <div className="flex flex-between flex-center">
                                     <div>
                                         <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                                            {session.day}{session.day === todayName && ' · Today'}
+                                            {gymLabel}{isToday && ' · Today'}
                                         </p>
                                         <p style={{ fontWeight: 500 }}>
                                             {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
@@ -3605,7 +3603,8 @@ function App() {
                                     </div>
                                 </div>
                             </div>
-                        ))}
+                        );
+                        })}
                     </div>
                     
                     {/* Key Principles */}
