@@ -3525,7 +3525,27 @@ function App() {
     // ============================================
     // PLAN TAB (with phase overview + weekly view)
     // ============================================
-    const renderPlan = () => (
+    // Week key for storing completed sessions (resets each Monday)
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
+    const weekKey = localDateStr(weekStart);
+    
+    const [completedSessions, setCompletedSessions] = useState(() => storage.get(`done_${weekKey}`, []));
+    
+    const toggleSession = (idx, e) => {
+        e.stopPropagation();
+        const updated = completedSessions.includes(idx) 
+            ? completedSessions.filter(i => i !== idx)
+            : [...completedSessions, idx];
+        setCompletedSessions(updated);
+        storage.set(`done_${weekKey}`, updated);
+    };
+    
+    const renderPlan = () => {
+        const remaining = weekPlan.filter((_, i) => !completedSessions.includes(i) && !weekPlan[i].flex);
+        const remainCount = remaining.length;
+        
+        return (
         <div className="container hide-scrollbar">
             <div className="px-5 py-4">
                 <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400 }}>Training Plan</h1>
@@ -3562,48 +3582,78 @@ function App() {
                     
                     {/* This Week's Sessions */}
                     <div className="px-5 mb-3">
-                        <p className="label">THIS WEEK</p>
+                        <div className="flex flex-between flex-center">
+                            <p className="label">{isWeekA ? 'WEEK A' : 'WEEK B'} · {remainCount > 0 ? `${remainCount} sessions remaining` : 'All done ✓'}</p>
+                        </div>
                     </div>
-                    <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {/* Remaining sessions first */}
                         {weekPlan.map((session, i) => {
-                            const isToday = session.day === todayName || 
-                                (isWeekend && (session.day === 'Weekend' || session.gym === 'weekend') && session === todaySession) ||
-                                (!isWeekend && (session.day === 'Weekday' || session.gym === 'weekday') && session === todaySession);
-                            const gymLabel = session.gym === 'weekend' ? '🏟 Weekend gym' : 
-                                session.gym === 'weekday' ? '🏢 Weekday gym' : 
-                                session.flex ? '⚡ Flex' : session.day;
+                            const done = completedSessions.includes(i);
+                            if (done) return null;
+                            const gymTag = session.gym === 'weekend' ? '🏟 Weekend' : 
+                                session.gym === 'weekday' ? '🏢 Weekday' : 
+                                session.flex ? '⚡ Optional' : '';
+                            const zoneColor = session.zone === 2 ? 'var(--green)' : session.zone === 4 ? 'var(--orange)' : session.zone === 5 ? 'var(--red)' : session.zone === 'str' ? 'var(--purple)' : 'var(--text-tertiary)';
                             return (
-                            <div key={i} className="card" style={{ 
-                                padding: 16, cursor: 'pointer',
-                                border: isToday ? '1px solid var(--blue)' : '1px solid var(--border)',
-                                opacity: session.flex ? 0.8 : 1
-                            }} onClick={() => setModal({ type: 'session', data: session })}>
-                                <div className="flex flex-between flex-center">
-                                    <div>
-                                        <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginBottom: 4 }}>
-                                            {gymLabel}{isToday && ' · Today'}
-                                        </p>
-                                        <p style={{ fontWeight: 500 }}>
-                                            {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
-                                        </p>
-                                        {session.hrTargets?.target && (
-                                            <p style={{ fontSize: 11, color: session.zone === 2 ? 'var(--green)' : session.zone >= 4 ? 'var(--red)' : 'var(--text-tertiary)', marginTop: 2 }}>
-                                                💓 {session.hrTargets.target} bpm ({session.hrTargets.range[0]}–{session.hrTargets.range[1]})
+                                <div key={i} className="card" style={{ 
+                                    padding: '14px 16px', cursor: 'pointer',
+                                    borderLeft: `4px solid ${zoneColor}`,
+                                    opacity: session.flex ? 0.7 : 1
+                                }}>
+                                    <div className="flex flex-between flex-center">
+                                        <div style={{ flex: 1 }} onClick={() => setModal({ type: 'session', data: session })}>
+                                            <div className="flex flex-center" style={{ gap: 8, marginBottom: 3 }}>
+                                                <p style={{ fontWeight: 600, fontSize: 15 }}>
+                                                    {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
+                                                </p>
+                                            </div>
+                                            <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                                                {gymTag}{gymTag && ' · '}{session.duration}min
+                                                {session.hrTargets?.target ? ` · 💓 ${session.hrTargets.target} bpm` : ''}
                                             </p>
-                                        )}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        {session.duration > 0 && (
-                                            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{session.duration}min</span>
-                                        )}
-                                        <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`} 
-                                            style={{ padding: '4px 10px', fontSize: 11, marginBottom: 0 }}>
-                                            {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : 'REST'}
-                                        </span>
+                                        </div>
+                                        <button onClick={(e) => toggleSession(i, e)} style={{
+                                            width: 36, height: 36, borderRadius: 18, border: `2px solid ${zoneColor}`,
+                                            background: 'transparent', cursor: 'pointer', display: 'flex', 
+                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                        }}>
+                                            <span style={{ fontSize: 11, color: zoneColor, fontWeight: 700 }}>
+                                                {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : '—'}
+                                            </span>
+                                        </button>
                                     </div>
                                 </div>
-                            </div>
-                        );
+                            );
+                        })}
+                        
+                        {/* Completed sessions below */}
+                        {completedSessions.length > 0 && (
+                            <p className="label" style={{ marginTop: 8, marginBottom: -2 }}>COMPLETED</p>
+                        )}
+                        {weekPlan.map((session, i) => {
+                            if (!completedSessions.includes(i)) return null;
+                            return (
+                                <div key={`done-${i}`} className="card" style={{ 
+                                    padding: '12px 16px', cursor: 'pointer', opacity: 0.45,
+                                    borderLeft: '4px solid var(--border)'
+                                }}>
+                                    <div className="flex flex-between flex-center">
+                                        <div style={{ flex: 1 }} onClick={() => setModal({ type: 'session', data: session })}>
+                                            <p style={{ fontWeight: 500, fontSize: 14, textDecoration: 'line-through', color: 'var(--text-tertiary)' }}>
+                                                {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
+                                            </p>
+                                        </div>
+                                        <button onClick={(e) => toggleSession(i, e)} style={{
+                                            width: 36, height: 36, borderRadius: 18, border: 'none',
+                                            background: 'var(--green)', cursor: 'pointer', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                        }}>
+                                            <span style={{ color: 'white', fontSize: 16 }}>✓</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            );
                         })}
                     </div>
                     
@@ -3671,6 +3721,7 @@ function App() {
             )}
         </div>
     );
+    };
     
     // ============================================
     // HISTORY TAB
