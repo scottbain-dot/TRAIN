@@ -2548,6 +2548,10 @@ function App() {
     const [tab, setTab] = useState('home');
     const [modal, setModal] = useState(null);
     const [zoneVersion, setZoneVersion] = useState(0); // Incremented when zone data is saved to trigger recalc
+    const [completedSessions, setCompletedSessions] = useState(() => {
+        const ws = new Date(); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
+        return storage.get(`done_${localDateStr(ws)}`, []);
+    });
     const [testModal, setTestModal] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [daily, setDaily] = useState([]);
@@ -2734,7 +2738,7 @@ function App() {
             // Sessions not assigned to fixed days — arrange around your schedule
             // HYROX-specific work (compromised, VO₂max on curve) → weekends only
             return [
-                { day: 'Weekday', type: isWeekA ? 'Strength A: Push' : 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: isWeekA ? 'Lower push + Upper push + Power + Sprints' : 'Lower pull + Upper pull + Power + Sprints', exercises: isWeekA ? [
+                { day: 'Weekday', type: 'Strength A: Push', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower push + Upper push + Power + Sprints', exercises: [
                     { name: 'Hex Bar Squat', sets: '3×5', load: '125kg', note: 'Controlled eccentric, drive up', category: 'LOWER PUSH' },
                     { name: 'DB Floor Press', sets: '3×5', load: '30kg', note: 'Pause at bottom', category: 'UPPER PUSH' },
                     { name: 'DB Lunges', sets: '3×5/5', load: '28kg', note: 'Full depth, drive through heel', category: 'LOWER PUSH' },
@@ -2742,7 +2746,8 @@ function App() {
                     { name: 'Cable Rotations', sets: '3×8/8', load: '16kg', note: 'Anti-rotation → controlled rotation', category: 'CORE' },
                     { name: 'Standing Calf Raise', sets: '3×6/6', load: '30kg', note: 'Pause 2s top, slow 3s lower', category: 'CALVES' },
                     { name: '8s Sprints', sets: '4×8s', load: '', note: '52s rest. Vary: curve, flat, hills', category: 'SPRINTS' }
-                ] : [
+                ], gym: 'weekday' },
+                { day: 'Weekday', type: 'Strength B: Pull', zone: 'str', duration: 60, distance: 0, modality: 'gym', purpose: 'Lower pull + Upper pull + Power + Sprints', exercises: [
                     { name: 'Hex Bar Deadlift', sets: '3×5', load: '135kg', note: 'Reset each rep. Brace hard.', category: 'LOWER PULL' },
                     { name: 'KB Row (single arm)', sets: '3×6/6', load: '32kg', note: 'Explosive pull, controlled lower', category: 'UPPER PULL' },
                     { name: 'KB Swing', sets: '3×8', load: '32kg', note: 'Hip snap. Arms are hooks.', category: 'LOWER PULL' },
@@ -3525,12 +3530,10 @@ function App() {
     // ============================================
     // PLAN TAB (with phase overview + weekly view)
     // ============================================
-    // Week key for storing completed sessions (resets each Monday)
+    // Week checklist state — defined at component level (hooks can't be inside render functions)
     const weekStart = new Date(today);
     weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7)); // Monday
     const weekKey = localDateStr(weekStart);
-    
-    const [completedSessions, setCompletedSessions] = useState(() => storage.get(`done_${weekKey}`, []));
     
     const toggleSession = (idx, e) => {
         e.stopPropagation();
