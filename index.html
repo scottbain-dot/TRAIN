@@ -1709,9 +1709,7 @@ const SessionCard = ({ session, isToday, onClick }) => {
     const badgeText = session.zone === 2 ? 'Z2' : session.zone === 4 ? 'THR' 
         : session.zone === 5 ? 'VO₂' : session.zone === 'str' ? 'STR' 
         : session.zone === 'sim' ? 'SIM' : 'REST';
-    const modalityIcon = session.modality === 'stepper' ? '⏫' : session.modality === 'run' ? '🏃' 
-        : session.modality === 'bike' ? '🚴' : session.modality === 'gym' ? '💪' 
-        : session.modality === 'swim' ? '🏊' : '';
+    const modalityIcon = '';
     
     const hrT = session.hrTargets;
     
@@ -1751,7 +1749,7 @@ const SessionCard = ({ session, isToday, onClick }) => {
             {isToday && hrT && !hrT.target && hrT.range && (
                 <div style={{ marginTop: 10, padding: '6px 12px', borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
                     <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
-                        💓 HR will vary: {hrT.range[0]}–{hrT.range[1]} bpm · {hrT.note?.split('.')[0]}
+                        HR will vary: {hrT.range[0]}–{hrT.range[1]} bpm · {hrT.note?.split('.')[0]}
                     </p>
                 </div>
             )}
@@ -1966,7 +1964,7 @@ const AerobicModal = ({ data, history, onClose }) => {
                     <InsightBox title={`📊 ${insight.title}`} text={insight.text} color={insight.color} />
                     
                     <InsightBox 
-                        title="📚 Research" 
+                        title="Research" 
                         text="Brownlee study: +100km monthly volume = -4.4 minutes race time. Volume is the #1 predictor of HYROX performance."
                         color="blue"
                     />
@@ -2085,7 +2083,7 @@ const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
                         </>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '40px 20px' }}>
-                            <p style={{ fontSize: 48, marginBottom: 16 }}>🏁</p>
+                            
                             <p style={{ fontSize: 18, fontWeight: 500, marginBottom: 8 }}>No mini-sim logged yet</p>
                             <p className="insight">Complete a 4×(1km + station) workout to track your HYROX-specific fitness.</p>
                         </div>
@@ -2095,7 +2093,7 @@ const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
                         Log Mini-Sim
                     </button>
                     
-                    <InsightBox title={`💪 ${insight.title}`} text={insight.text} color={insight.color} />
+                    <InsightBox title={insight.title} text={insight.text} color={insight.color} />
                 </div>
             </div>
         </div>
@@ -2226,7 +2224,7 @@ const SessionModal = ({ session, onClose }) => (
             <div className="modal-hero grad-session aurora">
                 <button className="modal-back" onClick={onClose}>‹</button>
                 <span className={`session-badge ${session.zone === 2 ? 'z2' : session.zone === 4 ? 'z4' : session.zone === 5 ? 'z5' : session.zone === 'str' ? 'str' : session.zone === 'sim' ? 'sim' : 'rest'}`}>
-                    {session.zone === 2 ? '🟢 Zone 2' : session.zone === 4 ? '🟠 Threshold' : session.zone === 5 ? '🔴 VO₂max' : session.zone === 'str' ? '💪 Strength' : session.zone === 'sim' ? '🏁 Simulation' : '😴 Recovery'}
+                    {session.zone === 2 ? 'Zone 2' : session.zone === 4 ? 'Threshold' : session.zone === 5 ? 'VO₂max' : session.zone === 'str' ? 'Strength' : session.zone === 'sim' ? 'Simulation' : 'Recovery'}
                 </span>
                 <p style={{ fontSize: 28, fontWeight: 600, marginTop: 12 }}>{session.type}</p>
                 <p style={{ fontSize: 15, color: 'var(--text-secondary)', marginTop: 8 }}>
@@ -2452,7 +2450,7 @@ const VolumeModal = ({ stats, targetVol, onClose }) => {
                     
                     {totalSessions === 0 && (
                         <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-tertiary)' }}>
-                            <p style={{ fontSize: 48, marginBottom: 16 }}>🏃</p>
+                            
                             <p>No workouts recorded this week yet</p>
                         </div>
                     )}
@@ -3093,13 +3091,16 @@ function App() {
     const historyData = computedData?.historyData || { vo2History: [], volHistory: [] };
     const latestTests = computedData?.latestTests || {};
     
-    // Today's session — handle flexible scheduling
+    // Today's session — first uncompleted session appropriate for today
     const isWeekend = today.getDay() === 0 || today.getDay() === 6;
-    const todaySession = weekPlan.find(s => s.day === todayName) // Exact day match first
-        || (isWeekend 
-            ? weekPlan.find(s => s.day === 'Weekend' || s.gym === 'weekend') 
-            : weekPlan.find(s => s.day === 'Weekday' || s.gym === 'weekday'))
-        || weekPlan[0];
+    const todaySession = weekPlan.find((s, i) => {
+        if (completedSessions.includes(i)) return false; // Skip completed
+        if (s.flex) return false; // Skip flex unless nothing else
+        if (s.day === todayName) return true;
+        if (isWeekend && (s.day === 'Weekend' || s.gym === 'weekend')) return true;
+        if (!isWeekend && (s.day === 'Weekday' || s.gym === 'weekday' || s.gym === 'any')) return true;
+        return false;
+    }) || weekPlan.find((s, i) => !completedSessions.includes(i)) || weekPlan[0];
     
     // Enrich today's session with HR targets from the engine
     if (todaySession && !todaySession.hrTargets) {
@@ -3377,19 +3378,19 @@ function App() {
                                     <div style={{ display: 'flex', gap: 12 }}>
                                         {stepperMins > 0 && (
                                             <div style={{ flex: 1, padding: '10px 14px', background: 'var(--card-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>⏫ Stepper</p>
+                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Stepper</p>
                                                 <p style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>{Math.round(stepperMins)}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}> min</span></p>
                                             </div>
                                         )}
                                         {runMins > 0 && (
                                             <div style={{ flex: 1, padding: '10px 14px', background: 'var(--card-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>🏃 Running</p>
+                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Running</p>
                                                 <p style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>{runKm.toFixed(1)}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}> km</span></p>
                                             </div>
                                         )}
                                         {strMins > 0 && (
                                             <div style={{ flex: 1, padding: '10px 14px', background: 'var(--card-elevated)', borderRadius: 12, border: '1px solid var(--border)' }}>
-                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>💪 Strength</p>
+                                                <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Strength</p>
                                                 <p style={{ fontSize: 20, fontWeight: 600, marginTop: 2 }}>{Math.round(strMins)}<span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}> min</span></p>
                                             </div>
                                         )}
@@ -3586,75 +3587,66 @@ function App() {
                     {/* This Week's Sessions */}
                     <div className="px-5 mb-3">
                         <div className="flex flex-between flex-center">
-                            <p className="label">{isWeekA ? 'WEEK A' : 'WEEK B'} · {remainCount > 0 ? `${remainCount} sessions remaining` : 'All done ✓'}</p>
+                            <p className="label">{isWeekA ? 'WEEK A' : 'WEEK B'} · {remainCount > 0 ? `${remainCount} remaining` : 'All done'}</p>
                         </div>
                     </div>
-                    <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {/* Remaining sessions first */}
+                    <div className="px-5" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {/* Remaining sessions */}
                         {weekPlan.map((session, i) => {
                             const done = completedSessions.includes(i);
                             if (done) return null;
-                            const gymTag = session.gym === 'weekend' ? '🏟 Weekend' : 
-                                session.gym === 'weekday' ? '🏢 Weekday' : 
-                                session.flex ? '⚡ Optional' : '';
+                            const gymTag = session.gym === 'weekend' ? 'Weekend' : 
+                                session.gym === 'weekday' ? 'Weekday' : 
+                                session.flex ? 'Optional' : '';
                             const zoneColor = session.zone === 2 ? 'var(--green)' : session.zone === 4 ? 'var(--orange)' : session.zone === 5 ? 'var(--red)' : session.zone === 'str' ? 'var(--purple)' : 'var(--text-tertiary)';
+                            const zoneLabel = session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : session.zone === 'sim' ? 'SIM' : '—';
                             return (
                                 <div key={i} className="card" style={{ 
                                     padding: '14px 16px', cursor: 'pointer',
-                                    borderLeft: `4px solid ${zoneColor}`,
-                                    opacity: session.flex ? 0.7 : 1
+                                    borderLeft: `3px solid ${zoneColor}`,
+                                    opacity: session.flex ? 0.6 : 1
                                 }}>
                                     <div className="flex flex-between flex-center">
                                         <div style={{ flex: 1 }} onClick={() => setModal({ type: 'session', data: session })}>
-                                            <div className="flex flex-center" style={{ gap: 8, marginBottom: 3 }}>
-                                                <p style={{ fontWeight: 600, fontSize: 15 }}>
-                                                    {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
-                                                </p>
-                                            </div>
+                                            <p style={{ fontWeight: 600, fontSize: 15, marginBottom: 2 }}>{session.type}</p>
                                             <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                                                 {gymTag}{gymTag && ' · '}{session.duration}min
-                                                {session.hrTargets?.target ? ` · 💓 ${session.hrTargets.target} bpm` : ''}
+                                                {session.hrTargets?.target ? ` · ${session.hrTargets.target} bpm` : ''}
                                             </p>
                                         </div>
                                         <button onClick={(e) => toggleSession(i, e)} style={{
-                                            width: 36, height: 36, borderRadius: 18, border: `2px solid ${zoneColor}`,
+                                            width: 32, height: 32, borderRadius: 16, 
+                                            border: `2px solid var(--border)`,
                                             background: 'transparent', cursor: 'pointer', display: 'flex', 
                                             alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                                        }}>
-                                            <span style={{ fontSize: 11, color: zoneColor, fontWeight: 700 }}>
-                                                {session.zone === 2 ? 'Z2' : session.zone === 4 ? 'Z4' : session.zone === 5 ? 'Z5' : session.zone === 'str' ? 'STR' : '—'}
-                                            </span>
-                                        </button>
+                                        }} />
                                     </div>
                                 </div>
                             );
                         })}
                         
-                        {/* Completed sessions below */}
+                        {/* Completed sessions */}
                         {completedSessions.length > 0 && (
-                            <p className="label" style={{ marginTop: 8, marginBottom: -2 }}>COMPLETED</p>
+                            <p className="label" style={{ marginTop: 12, marginBottom: -2 }}>COMPLETED</p>
                         )}
                         {weekPlan.map((session, i) => {
                             if (!completedSessions.includes(i)) return null;
                             return (
-                                <div key={`done-${i}`} className="card" style={{ 
-                                    padding: '12px 16px', cursor: 'pointer', opacity: 0.45,
-                                    borderLeft: '4px solid var(--border)'
+                                <div key={`done-${i}`} style={{ 
+                                    padding: '12px 16px', cursor: 'pointer', opacity: 0.4,
+                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
                                 }}>
-                                    <div className="flex flex-between flex-center">
-                                        <div style={{ flex: 1 }} onClick={() => setModal({ type: 'session', data: session })}>
-                                            <p style={{ fontWeight: 500, fontSize: 14, textDecoration: 'line-through', color: 'var(--text-tertiary)' }}>
-                                                {session.modality === 'stepper' ? '⏫ ' : session.modality === 'run' ? '🏃 ' : session.modality === 'bike' ? '🚴 ' : session.modality === 'gym' ? '💪 ' : ''}{session.type}
-                                            </p>
-                                        </div>
-                                        <button onClick={(e) => toggleSession(i, e)} style={{
-                                            width: 36, height: 36, borderRadius: 18, border: 'none',
-                                            background: 'var(--green)', cursor: 'pointer', display: 'flex',
-                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0
-                                        }}>
-                                            <span style={{ color: 'white', fontSize: 16 }}>✓</span>
-                                        </button>
-                                    </div>
+                                    <p style={{ fontSize: 14, textDecoration: 'line-through', color: 'var(--text-tertiary)' }}
+                                        onClick={() => setModal({ type: 'session', data: session })}>
+                                        {session.type}
+                                    </p>
+                                    <button onClick={(e) => toggleSession(i, e)} style={{
+                                        width: 32, height: 32, borderRadius: 16, border: 'none',
+                                        background: 'var(--green)', cursor: 'pointer', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center', flexShrink: 0
+                                    }}>
+                                        <span style={{ color: 'white', fontSize: 14, lineHeight: 1 }}>✓</span>
+                                    </button>
                                 </div>
                             );
                         })}
@@ -3662,7 +3654,7 @@ function App() {
                     
                     {/* Key Principles */}
                     <div className="px-5 mt-5">
-                        <InsightBox title="📚 Training Philosophy" text="3 runs + 2 stepper sessions + 2 strength. Stepper for Z2 volume (zero impact), running for intensity only (threshold, VO₂max, strides). 80/20 polarized: 80% easy, 20% hard. Aerobic volume is the #1 predictor of HYROX performance (Brownlee)." color="blue" />
+                        <InsightBox title="Training Philosophy" text="3 runs + 2 stepper sessions + 2 strength. Stepper for Z2 volume (zero impact), running for intensity only (threshold, VO₂max, strides). 80/20 polarized: 80% easy, 20% hard. Aerobic volume is the #1 predictor of HYROX performance (Brownlee)." color="blue" />
                     </div>
                 </>
             ) : (
