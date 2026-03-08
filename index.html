@@ -637,6 +637,26 @@ const CONFIG = {
         vo2max:       { target: 172, range: [166, 183], note: 'Hard intervals. Max sustainable for 3-5 min.' },
         compromised:  { target: 158, range: [150, 170], note: '1km repeats + stations. Avg will be lower due to transitions.' },
         strength:     { target: null, range: [100, 150], note: 'Variable. Spikes on power moves, drops on rest.' },
+    },
+    
+    // ═══ MONTHLY PROGRESSION TARGETS ═══
+    // Path to 15 km/h threshold (4:00/km) by December 2026
+    thresholdProgression: [
+        { month: '2026-03', speed: 11.0, pace: '5:27', label: 'Mar' },
+        { month: '2026-04', speed: 11.5, pace: '5:13', label: 'Apr' },
+        { month: '2026-05', speed: 12.0, pace: '5:00', label: 'May' },
+        { month: '2026-06', speed: 12.5, pace: '4:48', label: 'Jun' },
+        { month: '2026-07', speed: 13.0, pace: '4:37', label: 'Jul' },
+        { month: '2026-08', speed: 13.5, pace: '4:27', label: 'Aug' },
+        { month: '2026-09', speed: 14.0, pace: '4:17', label: 'Sep' },
+        { month: '2026-10', speed: 14.5, pace: '4:08', label: 'Oct' },
+        { month: '2026-11', speed: 15.0, pace: '4:00', label: 'Nov', target: true },
+        { month: '2026-12', speed: 15.0, pace: '4:00', label: 'Dec' },
+    ],
+    volumeTargets: {
+        '2026-03': 150, '2026-04': 200, '2026-05': 225, '2026-06': 250,
+        '2026-07': 275, '2026-08': 300, '2026-09': 300, '2026-10': 280,
+        '2026-11': 250, '2026-12': 150
     }
 };
 
@@ -2102,22 +2122,29 @@ const HyroxReadyModal = ({ data, history, onClose, onLogTest }) => {
 
 // Session Detail Modal
 // Zone Entry Modal — tap a workout, enter 5 zone values
+// Helper: parse number with comma or dot decimal separator
+const parseNum = (v) => parseFloat(String(v).replace(',', '.')) || 0;
+
 const ZoneEntryModal = ({ workout, onClose, onSave }) => {
+    // Unique key includes duration to differentiate same-type workouts on same day
+    const dur = Math.round(parseFloat(workout['Duration (min)']) || 0);
+    const zoneKey = `${workout['Date']}|${workout['Workout Type']}|${dur}`;
+    
     const [zones, setZones] = useState(() => {
-        const key = `${workout['Date']}|${workout['Workout Type']}`;
         const stored = storage.get('zones', {});
-        return stored[key] || { z1: '', z2: '', z3: '', z4: '', z5: '' };
+        // Try new key format first, fall back to old key for backwards compatibility
+        const oldKey = `${workout['Date']}|${workout['Workout Type']}`;
+        return stored[zoneKey] || stored[oldKey] || { z1: '', z2: '', z3: '', z4: '', z5: '' };
     });
     
     const handleSave = () => {
-        const key = `${workout['Date']}|${workout['Workout Type']}`;
         const allZones = storage.get('zones', {});
-        allZones[key] = {
-            z1: parseFloat(zones.z1) || 0,
-            z2: parseFloat(zones.z2) || 0,
-            z3: parseFloat(zones.z3) || 0,
-            z4: parseFloat(zones.z4) || 0,
-            z5: parseFloat(zones.z5) || 0
+        allZones[zoneKey] = {
+            z1: parseNum(zones.z1),
+            z2: parseNum(zones.z2),
+            z3: parseNum(zones.z3),
+            z4: parseNum(zones.z4),
+            z5: parseNum(zones.z5)
         };
         storage.set('zones', allZones);
         onSave();
@@ -2125,19 +2152,20 @@ const ZoneEntryModal = ({ workout, onClose, onSave }) => {
     };
     
     const handleDelete = () => {
-        const key = `${workout['Date']}|${workout['Workout Type']}`;
         const allZones = storage.get('zones', {});
-        delete allZones[key];
+        delete allZones[zoneKey];
+        // Also clean up old key format if it exists
+        const oldKey = `${workout['Date']}|${workout['Workout Type']}`;
+        delete allZones[oldKey];
         storage.set('zones', allZones);
         onSave();
         onClose();
     };
     
-    const dur = parseFloat(workout['Duration (min)']) || 0;
     const avgHR = parseFloat(workout['Avg HR']) || 0;
     const maxHR = parseFloat(workout['Max HR']) || 0;
     const classified = hrEngine.classifyWorkout(workout);
-    const total = (parseFloat(zones.z1) || 0) + (parseFloat(zones.z2) || 0) + (parseFloat(zones.z3) || 0) + (parseFloat(zones.z4) || 0) + (parseFloat(zones.z5) || 0);
+    const total = parseNum(zones.z1) + parseNum(zones.z2) + parseNum(zones.z3) + parseNum(zones.z4) + parseNum(zones.z5);
     const hasData = total > 0;
     
     const zoneColors = ['var(--text-tertiary)', 'var(--green)', 'var(--blue)', 'var(--orange)', 'var(--red)'];
@@ -2184,7 +2212,7 @@ const ZoneEntryModal = ({ workout, onClose, onSave }) => {
                         <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
                             <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 6 }}>
                                 {[1,2,3,4,5].map(z => {
-                                    const mins = parseFloat(zones[`z${z}`]) || 0;
+                                    const mins = parseNum(zones[`z${z}`]);
                                     if (mins <= 0) return null;
                                     return <div key={z} style={{ width: `${(mins/total)*100}%`, background: zoneColors[z-1] }} />;
                                 })}
@@ -2897,8 +2925,10 @@ function App() {
         // ═══ Merge stored zone data into workouts ═══
         const storedZones = storage.get('zones', {});
         workouts.forEach(w => {
-            const key = `${w['Date']}|${w['Workout Type']}`;
-            const zd = storedZones[key];
+            const dur = Math.round(parseFloat(w['Duration (min)']) || 0);
+            const newKey = `${w['Date']}|${w['Workout Type']}|${dur}`;
+            const oldKey = `${w['Date']}|${w['Workout Type']}`;
+            const zd = storedZones[newKey] || storedZones[oldKey];
             if (zd) {
                 w['Z1 min'] = zd.z1 || 0;
                 w['Z2 min'] = zd.z2 || 0;
@@ -3499,6 +3529,127 @@ function App() {
                 );
             })()}
             
+            {/* Threshold Pace Progression */}
+            <div className="px-5 mb-4 fade-up delay-4">
+                <div className="card" style={{ padding: 20 }}>
+                    <div className="flex flex-between flex-center" style={{ marginBottom: 16 }}>
+                        <div>
+                            <p className="label">THRESHOLD PACE</p>
+                            <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Path to 4:00/km</p>
+                        </div>
+                        {(() => {
+                            const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                            const target = CONFIG.thresholdProgression.find(t => t.month === currentMonth);
+                            const actual = storage.get('threshold_tests', []);
+                            const latest = actual.length > 0 ? actual[actual.length - 1] : null;
+                            return target ? (
+                                <div style={{ textAlign: 'right' }}>
+                                    <p style={{ fontSize: 22, fontWeight: 600, color: latest && latest.speed >= target.speed ? 'var(--green)' : 'var(--text-primary)' }}>
+                                        {latest ? `${latest.speed} km/h` : `${target.speed} km/h`}
+                                    </p>
+                                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                                        {latest ? `Tested · Target: ${target.speed}` : `Target this month`}
+                                    </p>
+                                </div>
+                            ) : null;
+                        })()}
+                    </div>
+                    
+                    {/* Progress bar visualization */}
+                    <div style={{ display: 'flex', gap: 3, marginBottom: 12 }}>
+                        {CONFIG.thresholdProgression.map((t, i) => {
+                            const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                            const isCurrent = t.month === currentMonth;
+                            const isPast = t.month < currentMonth;
+                            const tests = storage.get('threshold_tests', []);
+                            const monthTest = tests.find(test => test.date && test.date.startsWith(t.month));
+                            const hit = monthTest && monthTest.speed >= t.speed;
+                            
+                            return (
+                                <div key={i} style={{ 
+                                    flex: 1, height: 28, borderRadius: 4, position: 'relative',
+                                    background: hit ? 'var(--green)' : isCurrent ? 'var(--orange)' : isPast ? 'var(--red-dim)' : 'rgba(0,0,0,0.05)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                }}>
+                                    <span style={{ fontSize: 9, fontWeight: 600, 
+                                        color: hit ? 'white' : isCurrent ? 'white' : 'var(--text-tertiary)' }}>
+                                        {t.label}
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    
+                    {/* Speed scale */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>11.0 km/h</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>→</span>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>15.0 km/h</span>
+                    </div>
+                    
+                    {/* Monthly targets list */}
+                    {(() => {
+                        const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+                        const tests = storage.get('threshold_tests', []);
+                        const nearby = CONFIG.thresholdProgression.filter(t => {
+                            const diff = CONFIG.thresholdProgression.indexOf(t) - CONFIG.thresholdProgression.findIndex(x => x.month === currentMonth);
+                            return diff >= -1 && diff <= 2;
+                        });
+                        return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {nearby.map((t, i) => {
+                                    const isCurrent = t.month === currentMonth;
+                                    const monthTest = tests.find(test => test.date && test.date.startsWith(t.month));
+                                    return (
+                                        <div key={i} style={{ 
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                            padding: '8px 12px', borderRadius: 8,
+                                            background: isCurrent ? 'rgba(0,0,0,0.04)' : 'transparent'
+                                        }}>
+                                            <div>
+                                                <span style={{ fontSize: 13, fontWeight: isCurrent ? 600 : 400, 
+                                                    color: isCurrent ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                                    {t.label} {isCurrent && '← now'}
+                                                </span>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                                <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{t.pace}/km</span>
+                                                <span style={{ fontSize: 14, fontWeight: 600, 
+                                                    color: monthTest && monthTest.speed >= t.speed ? 'var(--green)' : 'var(--text-primary)' }}>
+                                                    {t.speed} km/h
+                                                </span>
+                                                {monthTest && (
+                                                    <span style={{ fontSize: 11, color: monthTest.speed >= t.speed ? 'var(--green)' : 'var(--orange)', fontWeight: 600 }}>
+                                                        {monthTest.speed >= t.speed ? '✓' : monthTest.speed}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
+                    
+                    {/* Log threshold test button */}
+                    <button onClick={() => {
+                        const speed = prompt('Threshold test speed (km/h):');
+                        if (speed && parseFloat(speed) > 0) {
+                            const tests = storage.get('threshold_tests', []);
+                            tests.push({ date: localDateStr(today), speed: parseFloat(speed) });
+                            storage.set('threshold_tests', tests);
+                            setZoneVersion(v => v + 1); // trigger re-render
+                        }
+                    }} style={{
+                        marginTop: 16, width: '100%', padding: '12px', borderRadius: 10,
+                        border: '1px dashed var(--border)', background: 'transparent',
+                        fontSize: 13, color: 'var(--text-secondary)', cursor: 'pointer'
+                    }}>
+                        Log threshold test
+                    </button>
+                </div>
+            </div>
+            
             {/* Race Countdown */}
             <div className="px-5 mb-4 fade-up delay-4">
                 <div className="card" style={{ padding: 20 }}>
@@ -3835,8 +3986,11 @@ function App() {
                                     {new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                                 </p>
                                 {sessions.map((w, i) => {
-                                    const key = `${w['Date']}|${w['Workout Type']}`;
-                                    const hasZones = !!storedZones[key];
+                                    const wDur = Math.round(parseFloat(w['Duration (min)']) || 0);
+                                    const newKey = `${w['Date']}|${w['Workout Type']}|${wDur}`;
+                                    const oldKey = `${w['Date']}|${w['Workout Type']}`;
+                                    const hasZones = !!storedZones[newKey] || !!storedZones[oldKey];
+                                    const zoneData = storedZones[newKey] || storedZones[oldKey];
                                     const dur = parseFloat(w['Duration (min)']) || 0;
                                     const avgHR = parseFloat(w['Avg HR']) || 0;
                                     const classified = hrEngine.classifyWorkout(w);
@@ -3860,8 +4014,8 @@ function App() {
                                                     {hasZones ? (
                                                         <div style={{ display: 'flex', height: 6, width: 50, borderRadius: 3, overflow: 'hidden' }}>
                                                             {[1,2,3,4,5].map(z => {
-                                                                const mins = storedZones[key][`z${z}`] || 0;
-                                                                const total = Object.values(storedZones[key]).reduce((s,v) => s + v, 0);
+                                                                const mins = zoneData[`z${z}`] || 0;
+                                                                const total = Object.values(zoneData).reduce((s,v) => s + v, 0);
                                                                 if (mins <= 0 || total <= 0) return null;
                                                                 const colors = ['var(--text-tertiary)', 'var(--green)', 'var(--blue)', 'var(--orange)', 'var(--red)'];
                                                                 return <div key={z} style={{ width: `${(mins/total)*100}%`, background: colors[z-1] }} />;
