@@ -2603,6 +2603,25 @@ const TestModal = ({ type, onClose, onSave }) => {
 // ============================================
 // MAIN APP
 // ============================================
+// Pre-seeded training journal from coaching conversations
+const JOURNAL_SEED = [
+    {date:"2026-02-25",type:"session",workout:"Bike Threshold",notes:"First structured threshold. 4x5min, 200-220W, 95RPM. HR: 147/156/160/166. Low HRV day (42ms).",ts:1740000000000},
+    {date:"2026-02-25",type:"session",workout:"Strength B: Pull",notes:"Hex DL: 130/140/145/145 x5. Cleans 60kg. KB Row 32kg. Added cable pulldown + T/Y raises.",ts:1740000100000},
+    {date:"2026-02-28",type:"injury",notes:"Calf tightness recurring. Avoid back-to-back heavy legs + running.",ts:1740200000000},
+    {date:"2026-03-01",type:"session",workout:"VO2max Curve Treadmill",notes:"First VO2max attempt. 14-15km/h curve. Effort 9. Could not complete 4x3min. Legs failed before lungs. HR peaked 174.",ts:1740400000000},
+    {date:"2026-03-06",type:"benchmark",notes:"Treadmill threshold baseline: 11.0 km/h (5:27/km). 4x5min HR: 158/157/162/162. Rep 4 at 11.5->168.",ts:1740800000000},
+    {date:"2026-03-08",type:"session",workout:"VO2max Curve Treadmill",notes:"Completed all 4x3min! 12-13km/h. Rep 4 pushed to 14. HR peaked 180. Effort 8. Big improvement.",ts:1741000000000},
+    {date:"2026-03-10",type:"benchmark",notes:"Threshold upgraded: 11.5 km/h sustained 4x5min. Ahead of April target.",ts:1741200000000},
+    {date:"2026-03-13",type:"session",workout:"VO2max Regular Treadmill",notes:"4x3min at 14km/h. Rep 4: 14.7km/h. HR peaked 173. Regular treadmill needs +1.5km/h vs curve.",ts:1741400000000},
+    {date:"2026-03-15",type:"session",workout:"Outdoor Z2 Run",notes:"7.75km, 50min, avg HR 141, 133m elevation. Hilly forest. Avg power 256W.",ts:1741600000000},
+    {date:"2026-03-15",type:"injury",notes:"Calves sore after heavy push + hilly run. Need 48h between heavy legs and running.",ts:1741700000000},
+    {date:"2026-03-17",type:"note",notes:"Sick. Forced deload week Mar 17-23.",ts:1741800000000},
+    {date:"2026-03-25",type:"session",workout:"Bike Threshold + Combined Strength",notes:"First back from illness. 3x5min at 220W. HR: 160/160/163. Quads burning. Stopped at 3 reps.",ts:1742900000000},
+    {date:"2026-03-25",type:"plan",notes:"Illness week = deload. New 5-week cycle starts Mar 23.",ts:1742900100000},
+    {date:"2026-03-29",type:"benchmark",notes:"Bike threshold: 250W at 95RPM (4x5min, HR: 144/160/167/171). Treadmill: 11.5km/h. Sprint: ~1100W fatigued.",ts:1743200000000},
+    {date:"2026-03-29",type:"session",workout:"Strength B: Pull",notes:"Hex DL 145x5. Sprint power ~1100W on watt bike fatigued.",ts:1743100000000}
+];
+
 function App() {
     const [tab, setTab] = useState('home');
     const [modal, setModal] = useState(null);
@@ -2614,6 +2633,10 @@ function App() {
     const [coachMessages, setCoachMessages] = useState([]);
     const [coachInput, setCoachInput] = useState('');
     const [coachLoading, setCoachLoading] = useState(false);
+    const [journal, setJournal] = useState(() => {
+        const stored = storage.get('training_journal', []);
+        return stored.length > 0 ? stored : JOURNAL_SEED;
+    });
     const [testModal, setTestModal] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [daily, setDaily] = useState([]);
@@ -3916,34 +3939,7 @@ function App() {
     // ============================================
     // AI COACH
     // ============================================
-    // Training journal — persistent notes that give the coach memory
-    const JOURNAL_SEED = [
-        {date:"2026-02-25",type:"session",workout:"Bike Threshold",notes:"First structured threshold. 4x5min, 200-220W, 95RPM. HR: 147/156/160/166. Low HRV day (42ms).",ts:1740000000000},
-        {date:"2026-02-25",type:"session",workout:"Strength B: Pull",notes:"Hex DL: 130/140/145/145 x5. Cleans 60kg. KB Row 32kg. Added cable pulldown + T/Y raises.",ts:1740000100000},
-        {date:"2026-02-28",type:"injury",notes:"Calf tightness recurring. Avoid back-to-back heavy legs + running.",ts:1740200000000},
-        {date:"2026-03-01",type:"session",workout:"VO2max Curve Treadmill",notes:"First VO2max attempt. 14-15km/h curve. Effort 9. Could not complete 4x3min. Legs failed before lungs. HR peaked 174.",ts:1740400000000},
-        {date:"2026-03-06",type:"benchmark",notes:"Treadmill threshold baseline: 11.0 km/h (5:27/km). 4x5min HR: 158/157/162/162. Rep 4 at 11.5->168.",ts:1740800000000},
-        {date:"2026-03-08",type:"session",workout:"VO2max Curve Treadmill",notes:"Completed all 4x3min! 12-13km/h. Rep 4 pushed to 14. HR peaked 180. Effort 8. Big improvement.",ts:1741000000000},
-        {date:"2026-03-10",type:"benchmark",notes:"Threshold upgraded: 11.5 km/h sustained 4x5min. Ahead of April target.",ts:1741200000000},
-        {date:"2026-03-13",type:"session",workout:"VO2max Regular Treadmill",notes:"4x3min at 14km/h. Rep 4: 14.7km/h. HR peaked 173. Regular treadmill needs +1.5km/h vs curve.",ts:1741400000000},
-        {date:"2026-03-15",type:"session",workout:"Outdoor Z2 Run",notes:"7.75km, 50min, avg HR 141, 133m elevation. Hilly forest. Avg power 256W.",ts:1741600000000},
-        {date:"2026-03-15",type:"injury",notes:"Calves sore after heavy push + hilly run. Need 48h between heavy legs and running.",ts:1741700000000},
-        {date:"2026-03-17",type:"note",notes:"Sick. Forced deload week Mar 17-23.",ts:1741800000000},
-        {date:"2026-03-25",type:"session",workout:"Bike Threshold + Combined Strength",notes:"First back from illness. 3x5min at 220W. HR: 160/160/163. Quads burning. Stopped at 3 reps.",ts:1742900000000},
-        {date:"2026-03-25",type:"plan",notes:"Illness week = deload. New 5-week cycle starts Mar 23.",ts:1742900100000},
-        {date:"2026-03-29",type:"benchmark",notes:"Bike threshold: 250W at 95RPM (4x5min, HR: 144/160/167/171). Treadmill: 11.5km/h. Sprint: ~1100W fatigued.",ts:1743200000000},
-        {date:"2026-03-29",type:"session",workout:"Strength B: Pull",notes:"Hex DL 145x5. Sprint power ~1100W on watt bike fatigued.",ts:1743100000000}
-    ];
-    
-    const [journal, setJournal] = useState(() => {
-        const stored = storage.get('training_journal', []);
-        if (stored.length === 0) {
-            // First load — seed with history and save to cloud
-            storage.set('training_journal', JOURNAL_SEED);
-            return JOURNAL_SEED;
-        }
-        return stored;
-    });
+    // Training journal — uses journal state from hooks above
     
     const addJournalEntry = (entry) => {
         const newEntry = { date: localDateStr(today), ...entry, ts: Date.now() };
