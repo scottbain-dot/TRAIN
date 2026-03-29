@@ -640,7 +640,7 @@ const CONFIG = {
     },
     
     // ═══ MONTHLY PROGRESSION TARGETS ═══
-    // Path to 15 km/h threshold (4:00/km) by December 2026
+    // Path to 15 km/h threshold (4:00/km) by November 2026
     thresholdProgression: [
         { month: '2026-03', speed: 11.0, pace: '5:27', label: 'Mar' },
         { month: '2026-04', speed: 11.5, pace: '5:13', label: 'Apr' },
@@ -1678,14 +1678,14 @@ const BarChart = ({ data, color = 'var(--blue)', height = 100, showLabels = true
     
     return (
         <div className="bar-chart" style={{ height: showLabels ? height + 24 : height }}>
-            {data.slice(-12).map((d, i) => (
-                <div 
-                    key={i} 
-                    className="bar" 
-                    style={{ 
+            {data.slice(-12).map((d, i, arr) => (
+                <div
+                    key={i}
+                    className="bar"
+                    style={{
                         height: `${(d.value / max) * 100}%`,
                         background: color,
-                        opacity: i === data.length - 1 ? 1 : 0.5 + (i / data.length) * 0.3
+                        opacity: i === arr.length - 1 ? 1 : 0.5 + (i / arr.length) * 0.3
                     }}
                 >
                     {showLabels && <span className="bar-label">{d.label}</span>}
@@ -1918,9 +1918,9 @@ const ReadinessModal = ({ data, onClose }) => {
                         
                         <ContributorBar 
                             label="Heart Rate Variability"
-                            sublabel={components.hrv.baseline60 > 0 
+                            sublabel={components.hrv.baseline60 > 0
                                 ? `Balance: ${components.hrv.balance >= 0 ? '+' : ''}${components.hrv.balance?.toFixed(0)}% vs 60-day avg`
-                                : `7-day avg: ${hrvAvg7?.toFixed(0) || '—'} ms`}
+                                : `Recent avg: ${components.hrv.avg14?.toFixed(0) || '—'} ms`}
                             value={`${components.hrv.value?.toFixed(0) || '—'} ms`}
                             score={components.hrv.score}
                             maxScore={components.hrv.max}
@@ -1951,8 +1951,8 @@ const ReadinessModal = ({ data, onClose }) => {
                         />
                     </div>
                     
-                    <InsightBox 
-                        title="💡 What this means"
+                    <InsightBox
+                        title="What this means"
                         text={message.text}
                         color={score >= 70 ? 'green' : score >= 55 ? 'orange' : 'red'}
                     />
@@ -2014,7 +2014,7 @@ const AerobicModal = ({ data, history, onClose }) => {
                         )}
                     </div>
                     
-                    <InsightBox title={`📊 ${insight.title}`} text={insight.text} color={insight.color} />
+                    <InsightBox title={insight.title} text={insight.text} color={insight.color} />
                     
                     <InsightBox 
                         title="Research" 
@@ -2084,7 +2084,7 @@ const RaceFitnessModal = ({ data, tests, onClose, onLogTest }) => {
                         </button>
                     </div>
                     
-                    <InsightBox title={`🎯 ${insight.title}`} text={insight.text} color={insight.color} />
+                    <InsightBox title={insight.title} text={insight.text} color={insight.color} />
                 </div>
             </div>
         </div>
@@ -2304,7 +2304,7 @@ const SessionModal = ({ session, onClose }) => (
                 {session.hrTargets && (
                     <div style={{ padding: 16, background: session.zone === 2 ? 'var(--green-dim)' : session.zone === 4 ? 'var(--orange-dim)' : session.zone === 5 ? 'var(--red-dim)' : 'rgba(0,0,0,0.03)', borderRadius: 14, marginBottom: 24 }}>
                         <div className="flex flex-between flex-center" style={{ marginBottom: 8 }}>
-                            <p style={{ fontWeight: 600, fontSize: 13 }}>❤️ Heart Rate Guide</p>
+                            <p style={{ fontWeight: 600, fontSize: 13 }}>Heart Rate Guide</p>
                             {session.hrTargets.target && (
                                 <span style={{ fontSize: 20, fontWeight: 700, color: session.zone === 2 ? 'var(--green)' : session.zone === 4 ? 'var(--orange)' : session.zone === 5 ? 'var(--red)' : 'var(--text)' }}>
                                     {session.hrTargets.target} bpm
@@ -2500,7 +2500,7 @@ const VolumeModal = ({ stats, targetVol, onClose }) => {
                                             <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                                                 {dur > 0 && dist > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.duration(dur)}</span>}
                                                 {pace > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{fmt.pace(pace)}</span>}
-                                                {hr > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>❤️ {hr} bpm</span>}
+                                                {hr > 0 && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{hr} bpm</span>}
                                             </div>
                                         </div>
                                     );
@@ -3238,7 +3238,7 @@ function App() {
                     {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? 'DELOAD' : `Cycle ${cycleWeek}/5`}{!isDeload && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
                 </p>
                 <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, marginTop: 4 }}>
-                    {todayName === 'Sunday' ? 'Rest Day' : `Today: ${todaySession.type}`}
+                    {todaySession.zone === 'rest' ? 'Rest Day' : `Today: ${todaySession.type}`}
                 </h1>
             </div>
             
@@ -3275,7 +3275,7 @@ function App() {
                         gradient="grad-race"
                         color="var(--orange)"
                         insight={racePrediction.insight.title}
-                        trend={{ type: racePrediction.gap <= 0 ? 'up' : 'neutral', icon: '🎯', text: racePrediction.confidence + ' conf.' }}
+                        trend={{ type: racePrediction.gap <= 0 ? 'up' : 'neutral', icon: '→', text: racePrediction.confidence + ' conf.' }}
                         onClick={() => setModal({ type: 'raceFitness' })}
                     />
                     <MetricCard
@@ -3951,7 +3951,7 @@ function App() {
     const buildCoachContext = () => {
         const ctx = [];
         ctx.push(`Today: ${localDateStr(today)} (${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]})`);
-        if (readiness.score > 0) ctx.push(`Readiness: ${readiness.score}/100 (${readiness.label}). RHR: ${readiness.rhr}bpm, HRV: ${readiness.hrv}ms, Sleep: ${readiness.sleep}h`);
+        if (readiness.score > 0) ctx.push(`Readiness: ${readiness.score}/100 (${readiness.message.status}). RHR: ${readiness.components.hr.value || '?'}bpm, HRV: ${readiness.components.hrv.value || '?'}ms, Sleep: ${readiness.components.sleep.value || '?'}h`);
         if (computedData) {
             const wz = computedData.weekZones;
             if (wz) ctx.push(`This week zones: Easy ${wz.easy?.pct?.toFixed(0)}%, Tempo ${wz.tempo?.pct?.toFixed(0)}%, Hard ${wz.hard?.pct?.toFixed(0)}%. Polarized: ${wz.isPolarized}`);
@@ -3965,7 +3965,7 @@ function App() {
         const remainingSessions = weekPlan.filter((_, i) => !completedSessions.includes(i) && !weekPlan[i].flex).map(s => s.type);
         ctx.push(`Sessions completed this week: ${completedCount}. Remaining: ${remainingSessions.join(', ') || 'All done'}`);
         
-        ctx.push(`Threshold pace: 11.5 km/h treadmill / 250W bike (target 15 km/h by Nov). VO2max: ${aerobic.vo2?.toFixed(1) || '?'}`);
+        ctx.push(`Threshold pace: 11.5 km/h treadmill / 250W bike (target 15 km/h by Nov). VO2max: ${aerobic.vo2max?.toFixed(1) || '?'}`);
         ctx.push(`Equipment: Weekday gym (treadmill, watt bike, spin bike, rower, stepper, free weights, curve treadmill). Weekend gym (ski erg, sled, curve treadmill, all HYROX stations).`);
         
         const recentWorkouts = workouts.slice(0, 10).map(w => `${w['Date']} ${w['Workout Type']} ${Math.round(parseFloat(w['Duration (min)']) || 0)}min avgHR:${w['Avg HR'] || '?'}`);
@@ -3997,7 +3997,7 @@ function App() {
         
         try {
             const context = buildCoachContext();
-            const systemPrompt = `You are the AI coach inside the HYROX ENGINE training app for Scott (Lad), a PE teacher and competitive HYROX athlete training for a December 2026 race in Malaga.
+            const systemPrompt = `You are the AI coach inside the HYROX ENGINE training app for Scott (Lad), a PE teacher and competitive HYROX athlete training for the April 2027 race in Malaga.
 
 You have access to his live training data and training journal below. Be concise, direct, and specific to his data. No generic advice. Use his actual numbers.
 
@@ -4028,7 +4028,7 @@ TRAINING PHILOSOPHY:
 - 80/20 polarized: 80% Z2 easy, 20% Z4-5 hard. Avoid Z3 junk miles.
 - Z2 stepper for aerobic volume (zero impact), running for intensity only.
 - 2 strength sessions per week (Push A + Pull B), combined sessions OK.
-- Path to 4:00/km (15 km/h) threshold by December 2026.
+- Path to 4:00/km (15 km/h) threshold by November 2026.
 - HR Zones (Apple Watch): Z1 <129, Z2 130-141, Z3 142-153, Z4 154-165, Z5 166+
 - Max HR: 183, Resting HR: ~55
 - Monthly threshold targets: Mar 11.0, Apr 11.5, May 12.0, Jun 12.5 ... Nov 15.0`;
@@ -4042,7 +4042,7 @@ TRAINING PHILOSOPHY:
             // Route through Apps Script proxy (handles API key server-side)
             // Apps Script redirects POST (302), so we need to follow manually
             const postBody = JSON.stringify({
-                model: 'claude-sonnet-4-20250514',
+                model: 'claude-sonnet-4-6',
                 max_tokens: 1000,
                 system: systemPrompt,
                 messages: messages
