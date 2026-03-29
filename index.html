@@ -4040,22 +4040,34 @@ TRAINING PHILOSOPHY:
             messages.push({ role: 'user', content: userMsg });
             
             // Route through Apps Script proxy (handles API key server-side)
-            // Apps Script redirects POST (302), so we need to follow manually
+            // Use text/plain to avoid CORS preflight (Apps Script can't handle OPTIONS)
+            // Body is still JSON — Apps Script parses it from e.postData.contents
             const postBody = JSON.stringify({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 1000,
                 system: systemPrompt,
                 messages: messages
             });
-            
+
             const initialResponse = await fetch(APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'text/plain' },
                 body: postBody,
                 redirect: 'follow'
             });
-            
+
+            if (!initialResponse.ok) {
+                console.error('[Coach] HTTP error:', initialResponse.status, initialResponse.statusText);
+                throw new Error('HTTP ' + initialResponse.status);
+            }
+
             const data = await initialResponse.json();
+
+            if (data.status === 'error') {
+                console.error('[Coach] API error:', data.message, data.detail || '');
+                throw new Error(data.message);
+            }
+
             let reply = data.content?.map(b => b.text || '').join('') || 'No response';
             
             // Parse journal entries from the response
