@@ -4039,22 +4039,19 @@ TRAINING PHILOSOPHY:
             }));
             messages.push({ role: 'user', content: userMsg });
             
-            // Route through Apps Script proxy (handles API key server-side)
-            // Use text/plain to avoid CORS preflight (Apps Script can't handle OPTIONS)
-            // Body is still JSON — Apps Script parses it from e.postData.contents
-            const postBody = JSON.stringify({
+            // Route through Apps Script proxy via GET (doPost is broken — 302 redirect drops body)
+            // Apps Script doGet handles ?action=coach&payload=... and forwards to Anthropic
+            const coachPayload = JSON.stringify({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 1000,
                 system: systemPrompt,
                 messages: messages
             });
 
-            const initialResponse = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain' },
-                body: postBody,
-                redirect: 'follow'
-            });
+            const coachUrl = `${APPS_SCRIPT_URL}?action=coach&payload=${encodeURIComponent(coachPayload)}`;
+            console.log('[Coach] Request URL length:', coachUrl.length);
+
+            const initialResponse = await fetch(coachUrl);
 
             if (!initialResponse.ok) {
                 console.error('[Coach] HTTP error:', initialResponse.status, initialResponse.statusText);
