@@ -663,9 +663,42 @@ const CONFIG = {
 // ============================================
 // UTILITIES
 // ============================================
+// Cloud storage via Google Apps Script + localStorage cache
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxL78wqm7aH8kKgj0Sqzh0LnpXSRyOMAVpNszzA_yPgpsIArMeiX3CBn4EomyWYztuP/exec';
+
 const storage = {
-    get: (k, d) => { try { return JSON.parse(localStorage.getItem('hyrox12_' + k)) || d; } catch { return d; } },
-    set: (k, v) => localStorage.setItem('hyrox12_' + k, JSON.stringify(v))
+    get: (k, d) => { 
+        try { return JSON.parse(localStorage.getItem('hyrox12_' + k)) || d; } catch { return d; } 
+    },
+    set: (k, v) => {
+        localStorage.setItem('hyrox12_' + k, JSON.stringify(v));
+        fetch(`${APPS_SCRIPT_URL}?action=set&key=${encodeURIComponent(k)}&payload=${encodeURIComponent(JSON.stringify(v))}`)
+            .catch(err => console.warn('[Cloud save failed]', k, err));
+    },
+    syncFromCloud: async () => {
+        try {
+            const res = await fetch(`${APPS_SCRIPT_URL}?action=getAll`);
+            const data = await res.json();
+            let updated = 0;
+            Object.entries(data).forEach(([k, v]) => {
+                if (v) {
+                    try {
+                        const parsed = JSON.parse(v);
+                        localStorage.setItem('hyrox12_' + k, JSON.stringify(parsed));
+                        updated++;
+                    } catch {
+                        localStorage.setItem('hyrox12_' + k, v);
+                        updated++;
+                    }
+                }
+            });
+            console.log(`[Cloud Sync] Pulled ${updated} keys from cloud`);
+            return updated;
+        } catch (err) {
+            console.warn('[Cloud Sync] Failed:', err);
+            return 0;
+        }
+    }
 };
 
 // Local date string helper — avoids UTC timezone shift from toISOString()
@@ -2578,6 +2611,9 @@ function App() {
         const ws = new Date(); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
         return storage.get(`done_${localDateStr(ws)}`, []);
     });
+    const [coachMessages, setCoachMessages] = useState([]);
+    const [coachInput, setCoachInput] = useState('');
+    const [coachLoading, setCoachLoading] = useState(false);
     const [testModal, setTestModal] = useState(null);
     const [workouts, setWorkouts] = useState([]);
     const [daily, setDaily] = useState([]);
@@ -2611,6 +2647,15 @@ function App() {
             if (w.length > 0) console.log('[Workout Sample]', { date: w[0]['Date'], type: w[0]['Workout Type'], dist: w[0]['Distance (km)'], dur: w[0]['Duration (min)'], avgHR: w[0]['Avg HR'], maxHR: w[0]['Max HR'], cal: w[0]['Calories'] });
             setDaily(d);
             setPlanData({ weekly: wp, strengthA: sa, strengthB: sb });
+            
+            // Sync cloud storage → localStorage (pulls zone data, checklist, tests from Google Sheet)
+            const synced = await storage.syncFromCloud();
+            if (synced > 0) {
+                // Reload tests from synced data
+                const cloudTests = storage.get('tests', {});
+                if (Object.keys(cloudTests).length > 0) setTests(cloudTests);
+            }
+            
             setLoading(false);
         })();
     }, []);
@@ -2682,8 +2727,8 @@ function App() {
     const currentTargetVol = currentPhase.volStart + (currentPhase.volEnd - currentPhase.volStart) * phaseProgress;
     
     // 4-week training cycle: Wk 1-3 normal, Wk 4 deload/test
-    const cycleWeek = (weeksIntoPhase % 4) + 1;
-    const isDeload = cycleWeek === 4;
+    const cycleWeek = (weeksIntoPhase % 5) + 1;
+    const isDeload = cycleWeek === 5;
     const isWeekA = weeksIntoPhase % 2 === 0; // Alternates threshold (A) vs compromised (B)
     
     // ============================================
@@ -2753,11 +2798,11 @@ function App() {
         
         if (phase === 'Base 2') {
             if (isDeload) return [
-                { day: 'Session 1', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.', gym: 'any' },
-                { day: 'Session 2', type: isWeekA ? 'Strength A (light)' : 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets (2 per exercise). Movement quality.', exercises: ['2 sets per exercise.'], gym: 'any' },
-                { day: 'Session 3', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate 2km TT and 20min threshold test each deload.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '9-20 min', note: '2km TT or 20min max distance' }, { block: 'Cool-down', time: '5 min' }], gym: 'any' },
-                { day: 'Session 4', type: 'Mini-Sim Test', zone: 'sim', duration: 40, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + ski erg 500m). Track splits + decay.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km run + ski erg 500m each round' }], gym: 'weekend' },
-                { day: 'Flex', type: 'Z2 or Off', zone: 2, duration: 40, distance: 0, modality: 'stepper', purpose: 'Listen to your body. Z2 stepper if feeling good, full rest if not.', gym: 'any', flex: true }
+                { day: 'Weekday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets per exercise. Movement quality over load.', exercises: ['2 sets per exercise. Same exercises, reduced volume.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets per exercise. Movement quality over load.', exercises: ['2 sets per exercise. Same exercises, reduced volume.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Threshold Test', zone: 4, duration: 35, distance: 0, modality: 'run', purpose: 'BENCHMARK: 20min at fastest sustainable speed on treadmill. Log result for pace progression tracking.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '20 min', note: 'Fastest speed you can hold for 20min. Start at 11.5, adjust.' }, { block: 'Cool-down', time: '5 min' }], gym: 'weekday' },
+                { day: 'Any', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD — light movement. Keep the engine ticking.', gym: 'any' },
+                { day: 'Flex', type: 'Off or Easy Walk', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Rest and recover. Trust the process.', gym: 'any', flex: true }
             ];
             // ═══ WEEK A: Threshold focus ═══
             // ═══ WEEK B: Compromised running focus ═══
@@ -2792,13 +2837,11 @@ function App() {
         
         if (phase === 'Build 1' || phase === 'Build 2' || phase === 'Build 3') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK — 60% volume.' },
-                { day: 'Tuesday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Wednesday', type: '2km TT or 20min Threshold Test', zone: 5, duration: 30, distance: 5, modality: 'run', purpose: 'TEST: Alternate each deload week.' },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery.' },
-                { day: 'Friday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'Reduced sets.', exercises: ['2 sets per exercise.'] },
-                { day: 'Saturday', type: 'Mini-Sim Test', zone: 'sim', duration: 45, distance: 4, modality: 'run', purpose: 'TEST: 4×(1km + station). Rotate: ski erg → sled push → row → farmer carry.' },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' }
+                { day: 'Weekday', type: 'Strength A (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets per exercise.', exercises: ['2 sets per exercise.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Strength B (light)', zone: 'str', duration: 45, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets per exercise.', exercises: ['2 sets per exercise.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Threshold Test', zone: 4, duration: 35, distance: 0, modality: 'run', purpose: 'BENCHMARK: 20min at fastest sustainable speed. Log for pace progression.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '20 min', note: 'Fastest speed you can hold for 20min.' }, { block: 'Cool-down', time: '5 min' }], gym: 'weekday' },
+                { day: 'Any', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD — light movement.', gym: 'any' },
+                { day: 'Flex', type: 'Off or Easy Walk', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Rest and recover.', gym: 'any', flex: true }
             ];
             return [
                 { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 50, distance: 0, modality: 'stepper', purpose: 'Aerobic volume. Zero impact.' },
@@ -2845,13 +2888,11 @@ function App() {
         
         if (phase === 'Race Specific') {
             if (isDeload) return [
-                { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD WEEK.' },
-                { day: 'Tuesday', type: 'Strength (light)', zone: 'str', duration: 40, distance: 0, modality: 'gym', purpose: '2 sets. Maintenance.', exercises: ['2 sets per exercise.'] },
-                { day: 'Wednesday', type: 'Test: Compromised Run', zone: 4, duration: 50, distance: 6, modality: 'run', purpose: 'TEST: 4×(1km + station). Track splits + total time vs previous.', structure: [{ block: '4 rounds', time: '~35 min', note: '1km + rotating stations' }] },
-                { day: 'Thursday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Recovery.' },
-                { day: 'Friday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest.' },
-                { day: 'Saturday', type: 'Race Simulation', zone: 'sim', duration: 80, distance: 8, modality: 'run', purpose: 'Full sim: 8×(1km + station). Race effort.', structure: [{ block: 'Full simulation', time: '60-80 min', note: '8 rounds at race pace' }] },
-                { day: 'Sunday', type: 'Rest', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Full rest after sim.' }
+                { day: 'Weekday', type: 'Strength A (light)', zone: 'str', duration: 40, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets. Maintenance.', exercises: ['2 sets per exercise.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Strength B (light)', zone: 'str', duration: 40, distance: 0, modality: 'gym', purpose: 'DELOAD — 2 sets. Maintenance.', exercises: ['2 sets per exercise.'], gym: 'weekday' },
+                { day: 'Weekday', type: 'Threshold Test', zone: 4, duration: 35, distance: 0, modality: 'run', purpose: 'BENCHMARK: 20min at fastest sustainable speed. Compare to previous tests.', structure: [{ block: 'Warm-up', time: '10 min' }, { block: 'Test', time: '20 min', note: 'Fastest speed you can hold for 20min.' }, { block: 'Cool-down', time: '5 min' }], gym: 'weekday' },
+                { day: 'Any', type: 'Z2 Stepper', zone: 2, duration: 30, distance: 0, modality: 'stepper', purpose: 'DELOAD — light movement.', gym: 'any' },
+                { day: 'Flex', type: 'Off or Easy Walk', zone: 'rest', duration: 0, distance: 0, modality: 'rest', purpose: 'Rest and recover.', gym: 'any', flex: true }
             ];
             return [
                 { day: 'Monday', type: 'Z2 Stepper', zone: 2, duration: 45, distance: 0, modality: 'stepper', purpose: 'Recovery from weekend. Zero impact.' },
@@ -3171,7 +3212,7 @@ function App() {
         <div className="container hide-scrollbar">
             <div className="px-5 py-4 fade-up">
                 <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>
-                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? '🔄 DELOAD/TEST' : `Cycle ${cycleWeek}/4`}{!isDeload && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
+                    {currentPhase.name} · Week {weeksIntoPhase + 1} of {currentPhase.weeks} · {isDeload ? 'DELOAD' : `Cycle ${cycleWeek}/5`}{!isDeload && currentPhase.name !== 'Peak + Taper' ? ` · ${isWeekA ? 'Threshold' : 'Compromised'} wk` : ''}
                 </p>
                 <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400, marginTop: 4 }}>
                     {todayName === 'Sunday' ? 'Rest Day' : `Today: ${todaySession.type}`}
@@ -3872,6 +3913,234 @@ function App() {
     // ============================================
     // HISTORY TAB
     // ============================================
+    // ============================================
+    // AI COACH
+    // ============================================
+    // Training journal — persistent notes that give the coach memory
+    const [journal, setJournal] = useState(() => storage.get('training_journal', []));
+    
+    const addJournalEntry = (entry) => {
+        const newEntry = { date: localDateStr(today), ...entry, ts: Date.now() };
+        const updated = [...journal, newEntry].slice(-50); // Keep last 50 entries
+        setJournal(updated);
+        storage.set('training_journal', updated);
+    };
+    
+    const buildCoachContext = () => {
+        const ctx = [];
+        ctx.push(`Today: ${localDateStr(today)} (${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][today.getDay()]})`);
+        if (readiness.score > 0) ctx.push(`Readiness: ${readiness.score}/100 (${readiness.label}). RHR: ${readiness.rhr}bpm, HRV: ${readiness.hrv}ms, Sleep: ${readiness.sleep}h`);
+        if (computedData) {
+            const wz = computedData.weekZones;
+            if (wz) ctx.push(`This week zones: Easy ${wz.easy?.pct?.toFixed(0)}%, Tempo ${wz.tempo?.pct?.toFixed(0)}%, Hard ${wz.hard?.pct?.toFixed(0)}%. Polarized: ${wz.isPolarized}`);
+            const acwr = computedData.acwr;
+            if (acwr) ctx.push(`ACWR: ${acwr.ratio?.toFixed(2)} (${acwr.status}). Acute TRIMP/day: ${acwr.acute?.toFixed(0)}, Chronic: ${acwr.chronic?.toFixed(0)}`);
+        }
+        ctx.push(`Current phase: ${currentPhase.name}, Week ${weeksIntoPhase + 1}/${currentPhase.weeks}, Cycle ${cycleWeek}/5${isDeload ? ' (DELOAD)' : ''}`);
+        ctx.push(`Week type: ${isWeekA ? 'A (Threshold)' : 'B (Compromised)'}`);
+        
+        const completedCount = completedSessions.length;
+        const remainingSessions = weekPlan.filter((_, i) => !completedSessions.includes(i) && !weekPlan[i].flex).map(s => s.type);
+        ctx.push(`Sessions completed this week: ${completedCount}. Remaining: ${remainingSessions.join(', ') || 'All done'}`);
+        
+        ctx.push(`Threshold pace: 11.5 km/h treadmill / 250W bike (target 15 km/h by Nov). VO2max: ${aerobic.vo2?.toFixed(1) || '?'}`);
+        ctx.push(`Equipment: Weekday gym (treadmill, watt bike, spin bike, rower, stepper, free weights, curve treadmill). Weekend gym (ski erg, sled, curve treadmill, all HYROX stations).`);
+        
+        const recentWorkouts = workouts.slice(0, 10).map(w => `${w['Date']} ${w['Workout Type']} ${Math.round(parseFloat(w['Duration (min)']) || 0)}min avgHR:${w['Avg HR'] || '?'}`);
+        if (recentWorkouts.length > 0) ctx.push(`Recent workouts:\n${recentWorkouts.join('\n')}`);
+        
+        // Training journal — the coach's memory
+        if (journal.length > 0) {
+            const recentJournal = journal.slice(-20).map(e => {
+                let line = `[${e.date}]`;
+                if (e.type === 'session') line += ` SESSION: ${e.workout} — ${e.notes}`;
+                else if (e.type === 'injury') line += ` INJURY: ${e.notes}`;
+                else if (e.type === 'plan') line += ` PLAN CHANGE: ${e.notes}`;
+                else if (e.type === 'benchmark') line += ` BENCHMARK: ${e.notes}`;
+                else line += ` ${e.notes || ''}`;
+                return line;
+            });
+            ctx.push(`\nTRAINING JOURNAL (recent entries):\n${recentJournal.join('\n')}`);
+        }
+        
+        return ctx.join('\n');
+    };
+    
+    const sendCoachMessage = async () => {
+        if (!coachInput.trim() || coachLoading) return;
+        const userMsg = coachInput.trim();
+        setCoachInput('');
+        setCoachMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        setCoachLoading(true);
+        
+        try {
+            const context = buildCoachContext();
+            const systemPrompt = `You are the AI coach inside the HYROX ENGINE training app for Scott (Lad), a PE teacher and competitive HYROX athlete training for a December 2026 race in Malaga.
+
+You have access to his live training data and training journal below. Be concise, direct, and specific to his data. No generic advice. Use his actual numbers.
+
+Keep responses short (2-4 sentences for simple questions, longer for analysis).
+
+CRITICAL: When the athlete logs a session or reports results, ALWAYS respond with a JSON block at the end of your message (hidden from display) so the app can parse and store it:
+<journal>{"type":"session","workout":"Bike Threshold","notes":"4x5min at 250W. HR: 144/160/167/171. Legs heavy from yesterday's strength."}</journal>
+
+Journal entry types: "session" (workout done), "injury" (pain/tightness), "plan" (schedule change), "benchmark" (test result), "note" (general observation).
+
+Only include the journal tag when there's something worth logging. Don't include it for general questions.
+
+ATHLETE CONTEXT:
+${context}
+
+KEY HISTORY:
+- Calf tightness is recurring — avoid back-to-back heavy leg work + running
+- Was sick week of Mar 17-23, forced deload
+- Threshold progression: Feb 25 bike 220W / Mar 6 treadmill 11.0 / Mar 10 treadmill 11.5 / Mar 29 bike 250W
+- VO2max progression: Mar 1 couldn't complete intervals / Mar 8 completed 4x3min curve 12-13km/h / Mar 13 completed 4x3min regular 14km/h
+- Strength: Hex bar deadlift 145x5, Hex squat working up, Cleans 60kg
+- Sprint power: ~1100W on watt bike (fatigued)
+- 5-week training cycle (4 build + 1 deload)
+- Both gyms have watt bikes and curve treadmills
+- Weekday gym: no sled or ski erg. Weekend gym: full HYROX setup.
+
+TRAINING PHILOSOPHY:
+- 80/20 polarized: 80% Z2 easy, 20% Z4-5 hard. Avoid Z3 junk miles.
+- Z2 stepper for aerobic volume (zero impact), running for intensity only.
+- 2 strength sessions per week (Push A + Pull B), combined sessions OK.
+- Path to 4:00/km (15 km/h) threshold by December 2026.
+- HR Zones (Apple Watch): Z1 <129, Z2 130-141, Z3 142-153, Z4 154-165, Z5 166+
+- Max HR: 183, Resting HR: ~55
+- Monthly threshold targets: Mar 11.0, Apr 11.5, May 12.0, Jun 12.5 ... Nov 15.0`;
+
+            const messages = coachMessages.filter(m => m.role === 'user' || m.role === 'assistant').slice(-10).map(m => ({
+                role: m.role === 'user' ? 'user' : 'assistant',
+                content: m.text
+            }));
+            messages.push({ role: 'user', content: userMsg });
+            
+            // Route through Apps Script proxy (handles API key server-side)
+            // Apps Script redirects POST (302), so we need to follow manually
+            const postBody = JSON.stringify({
+                model: 'claude-sonnet-4-20250514',
+                max_tokens: 1000,
+                system: systemPrompt,
+                messages: messages
+            });
+            
+            const initialResponse = await fetch(APPS_SCRIPT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: postBody,
+                redirect: 'follow'
+            });
+            
+            const data = await initialResponse.json();
+            let reply = data.content?.map(b => b.text || '').join('') || 'No response';
+            
+            // Parse journal entries from the response
+            const journalMatch = reply.match(/<journal>(.*?)<\/journal>/s);
+            if (journalMatch) {
+                try {
+                    const entry = JSON.parse(journalMatch[1]);
+                    addJournalEntry(entry);
+                    console.log('[Coach] Journal entry added:', entry);
+                } catch (e) {
+                    console.warn('[Coach] Failed to parse journal entry:', e);
+                }
+                // Remove the journal tag from displayed message
+                reply = reply.replace(/<journal>.*?<\/journal>/s, '').trim();
+            }
+            
+            setCoachMessages(prev => [...prev, { role: 'assistant', text: reply }]);
+        } catch (err) {
+            console.error('[Coach] Error:', err);
+            setCoachMessages(prev => [...prev, { role: 'assistant', text: 'Coach unavailable. Check connection.' }]);
+        }
+        setCoachLoading(false);
+    };
+    
+    const renderCoach = () => (
+        <div className="container hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div className="px-5 py-4">
+                <div className="flex flex-between flex-center">
+                    <div>
+                        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, fontWeight: 400 }}>Coach</h1>
+                        <p style={{ color: 'var(--text-secondary)' }}>AI-powered training guidance</p>
+                    </div>
+                    {journal.length > 0 && (
+                        <span style={{ fontSize: 11, color: 'var(--text-tertiary)', padding: '4px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.04)' }}>
+                            {journal.length} journal entries
+                        </span>
+                    )}
+                </div>
+            </div>
+            
+            {/* Messages */}
+            <div className="px-5" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 100 }}>
+                {coachMessages.length === 0 && (
+                    <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+                        <p style={{ fontSize: 15, color: 'var(--text-tertiary)', marginBottom: 16 }}>Ask me anything about your training</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                            {['What should I do today?', 'Log: threshold bike 4x5min at 250W, HR 144/160/167/171', 'Am I on track for 15 km/h by November?', 'Analyze my training this week', 'Calf is tight — what should I adjust?', 'Show my training journal'].map((q, i) => (
+                                <button key={i} onClick={() => { setCoachInput(q); }} style={{
+                                    padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border)',
+                                    background: 'transparent', fontSize: 13, color: 'var(--text-secondary)',
+                                    cursor: 'pointer', textAlign: 'left'
+                                }}>{q}</button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {coachMessages.map((msg, i) => (
+                    <div key={i} style={{
+                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                        maxWidth: '85%',
+                        padding: '12px 16px', borderRadius: 14,
+                        background: msg.role === 'user' ? 'var(--blue)' : 'var(--card-elevated)',
+                        color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
+                        fontSize: 14, lineHeight: 1.5,
+                        whiteSpace: 'pre-wrap'
+                    }}>
+                        {msg.text}
+                    </div>
+                ))}
+                {coachLoading && (
+                    <div style={{ alignSelf: 'flex-start', padding: '12px 16px', borderRadius: 14, background: 'var(--card-elevated)', color: 'var(--text-tertiary)', fontSize: 14 }}>
+                        Thinking...
+                    </div>
+                )}
+            </div>
+            
+            {/* Input */}
+            <div style={{ 
+                position: 'fixed', bottom: 70, left: 0, right: 0, 
+                padding: '12px 20px', background: 'var(--bg)',
+                borderTop: '1px solid var(--border)'
+            }}>
+                <div style={{ display: 'flex', gap: 8 }}>
+                    <input
+                        type="text"
+                        value={coachInput}
+                        onChange={e => setCoachInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && sendCoachMessage()}
+                        placeholder="Ask your coach..."
+                        style={{
+                            flex: 1, padding: '12px 16px', borderRadius: 12,
+                            border: '1px solid var(--border)', fontSize: 15,
+                            background: 'var(--card-elevated)', color: 'var(--text-primary)'
+                        }}
+                    />
+                    <button onClick={sendCoachMessage} disabled={coachLoading || !coachInput.trim()} style={{
+                        padding: '12px 20px', borderRadius: 12, border: 'none',
+                        background: coachInput.trim() ? 'var(--blue)' : 'var(--border)',
+                        color: 'white', fontWeight: 600, fontSize: 15, cursor: 'pointer'
+                    }}>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+    
     const renderHistory = () => {
         // Calculate history stats
         const rangeMap = { '3M': 90, '6M': 180, 'Y': 365, 'All': 9999 };
@@ -4048,6 +4317,7 @@ function App() {
         <>
             {tab === 'home' && renderHome()}
             {tab === 'plan' && renderPlan()}
+            {tab === 'coach' && renderCoach()}
             {tab === 'history' && renderHistory()}
             
             {/* Navigation */}
@@ -4067,6 +4337,12 @@ function App() {
                         <line x1="3" y1="10" x2="21" y2="10"/>
                     </svg>
                     <span>Plan</span>
+                </button>
+                <button className={`nav-item ${tab === 'coach' ? 'active' : ''}`} onClick={() => setTab('coach')}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span>Coach</span>
                 </button>
                 <button className={`nav-item ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
