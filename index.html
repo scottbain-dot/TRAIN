@@ -4039,8 +4039,9 @@ TRAINING PHILOSOPHY:
             }));
             messages.push({ role: 'user', content: userMsg });
             
-            // Route through Apps Script proxy via GET (doPost is broken — 302 redirect drops body)
-            // Apps Script doGet handles ?action=coach&payload=... and forwards to Anthropic
+            // Route through Apps Script proxy
+            // fetch() POST fails: 302 redirect drops body. GET fails: URL too long for Safari.
+            // Solution: XMLHttpRequest follows 302 redirects AND re-sends POST body.
             const coachPayload = JSON.stringify({
                 model: 'claude-sonnet-4-6',
                 max_tokens: 1000,
@@ -4048,23 +4049,21 @@ TRAINING PHILOSOPHY:
                 messages: messages
             });
 
-            const coachUrl = `${APPS_SCRIPT_URL}?action=coach&payload=${encodeURIComponent(coachPayload)}`;
-            console.log('[Coach] Request URL length:', coachUrl.length);
+            const data = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', APPS_SCRIPT_URL);
+                xhr.setRequestHeader('Content-Type', 'text/plain');
+                xhr.onload = () => {
+                    try { resolve(JSON.parse(xhr.responseText)); }
+                    catch (e) { reject(new Error('Invalid JSON response: ' + xhr.responseText.substring(0, 200))); }
+                };
+                xhr.onerror = () => reject(new Error('Network error'));
+                xhr.ontimeout = () => reject(new Error('Request timed out'));
+                xhr.timeout = 60000;
+                xhr.send(coachPayload);
+            });
 
-            const initialResponse = await fetch(coachUrl);
-
-            if (!initialResponse.ok) {
-                console.error('[Coach] HTTP error:', initialResponse.status, initialResponse.statusText);
-                throw new Error('HTTP ' + initialResponse.status);
-            }
-
-            const data = await initialResponse.json();
-
-            if (data.status === 'error') {
-                console.error('[Coach] API error:', data.message, data.detail || '');
-                throw new Error(data.message);
-            }
-
+            if (data.status === 'error') throw new Error(data.message);
             let reply = data.content?.map(b => b.text || '').join('') || 'No response';
             
             // Parse journal entries from the response
