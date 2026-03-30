@@ -4084,7 +4084,7 @@ TRAINING PHILOSOPHY:
             setCoachMessages(prev => [...prev, { role: 'assistant', text: reply }]);
         } catch (err) {
             console.error('[Coach] Error:', err);
-            setCoachMessages(prev => [...prev, { role: 'assistant', text: 'Coach unavailable. Check connection.' }]);
+            setCoachMessages(prev => [...prev, { role: 'assistant', text: 'Coach error: ' + (err.message || err) + '. Check console for details.' }]);
         }
         setCoachLoading(false);
     };
