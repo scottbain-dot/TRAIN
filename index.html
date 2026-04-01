@@ -2630,7 +2630,7 @@ function App() {
         const ws = new Date(); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
         return storage.get(`done_${localDateStr(ws)}`, []);
     });
-    const [coachMessages, setCoachMessages] = useState([]);
+    const [coachMessages, setCoachMessages] = useState(() => storage.get('coach_messages', []).slice(-20));
     const [coachInput, setCoachInput] = useState('');
     const [coachLoading, setCoachLoading] = useState(false);
     const [journal, setJournal] = useState(() => {
@@ -3939,8 +3939,14 @@ function App() {
     // ============================================
     // AI COACH
     // ============================================
+    const saveCoachMessages = (msgs) => {
+        const trimmed = msgs.slice(-20);
+        storage.set('coach_messages', trimmed);
+        return trimmed;
+    };
+
     // Training journal — uses journal state from hooks above
-    
+
     const addJournalEntry = (entry) => {
         const newEntry = { date: localDateStr(today), ...entry, ts: Date.now() };
         const updated = [...journal, newEntry].slice(-50); // Keep last 50 entries
@@ -3992,7 +3998,7 @@ function App() {
         if (!coachInput.trim() || coachLoading) return;
         const userMsg = coachInput.trim();
         setCoachInput('');
-        setCoachMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+        setCoachMessages(prev => saveCoachMessages([...prev, { role: 'user', text: userMsg }]));
         setCoachLoading(true);
         
         try {
@@ -4080,10 +4086,10 @@ TRAINING PHILOSOPHY:
                 reply = reply.replace(/<journal>.*?<\/journal>/s, '').trim();
             }
             
-            setCoachMessages(prev => [...prev, { role: 'assistant', text: reply }]);
+            setCoachMessages(prev => saveCoachMessages([...prev, { role: 'assistant', text: reply }]));
         } catch (err) {
             console.error('[Coach] Error:', err);
-            setCoachMessages(prev => [...prev, { role: 'assistant', text: 'Coach error: ' + (err.message || err) + '. Check console for details.' }]);
+            setCoachMessages(prev => saveCoachMessages([...prev, { role: 'assistant', text: 'Coach error: ' + (err.message || err) + '. Check console for details.' }]));
         }
         setCoachLoading(false);
     };
