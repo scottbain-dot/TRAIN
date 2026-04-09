@@ -132,6 +132,7 @@ Sessions are not assigned to fixed days — athlete arranges around schedule.
 
 **Strength A: Push**
 - Squat (alternates): Week A — Back Squat 4×5 (start 80kg, +5kg/session from 2026-04-06) · Week B — Hex Bar Squat 3×5 @ 125kg
+- Week B accessory: Single-Leg Squat to Bench 3×6/6 (surgery side first, BW → DB). Addresses L/R imbalance — weak knee-surgery side causes the other leg's calf to overload.
 - DB Floor Press: 3×5 @ 30kg
 - DB Lunges: 3×5/5 @ 28kg
 - DB Squat Jumps: 3×6 @ 18kg
