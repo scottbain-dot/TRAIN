@@ -131,7 +131,7 @@ Sessions are not assigned to fixed days — athlete arranges around schedule.
 ### Strength Sessions
 
 **Strength A: Push**
-- Hex Bar Squat: 3×5 @ 125kg
+- Squat (alternates): Week A — Back Squat 4×5 (start 80kg, +5kg/session from 2026-04-06) · Week B — Hex Bar Squat 3×5 @ 125kg
 - DB Floor Press: 3×5 @ 30kg
 - DB Lunges: 3×5/5 @ 28kg
 - DB Squat Jumps: 3×6 @ 18kg
